@@ -43,3 +43,7 @@ ct:
 
 ct_image:
 	docker build --no-cache -f test/ct/Dockerfile test/ct/ --tag cray-power-control-hmth-test:${VERSION}
+
+image-pprof:
+	docker build --pull ${DOCKER_ARGS} --tag '${NAME}-pprof:${VERSION}' -f Dockerfile.pprof .
+

@@ -125,6 +125,10 @@ func NewRouter() *chi.Mux {
 		router.Method(route.Method, "/v1"+route.Pattern, handler)
 	}
 
+	// If the 'pprof' build tag is set, then this will register pprof handlers,
+	// otherwise this function is stubbed and will do nothing.
+	RegisterPProfHandlers(router)
+
 	return router
 }
 
