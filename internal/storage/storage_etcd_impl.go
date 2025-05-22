@@ -34,8 +34,8 @@ import (
 	"time"
 
 	hmetcd "github.com/Cray-HPE/hms-hmetcd"
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
 	"github.com/Cray-HPE/hms-xname/xnametypes"
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -463,6 +463,11 @@ func (e *ETCDStorage) StoreTransition(transition model.Transition) error {
 		combinedErr = err
 	}
 
+	// TRC effectively this will be a set of smaller transitions, each including a subslice of the various slice
+	// TRC fields in the transition, so that it can fit into a single etcd key. there's either no relationships to care
+	// TRC about or they're irrelevant because they're reassembled into a single transition on get, just chop the thing
+	// TRC into random chunks and hope we can put it back together again.
+	// TRC separate tables make more sense for an RDMS.
 	for _, page := range tPages {
 		// Task pages
 		key = fmt.Sprintf("%s/%s/%d", keySegTransitionPage, page.TransitionID.String(), page.Index)
@@ -481,10 +486,12 @@ func (e *ETCDStorage) truncateAndPageTransitionIfNeeded(transition model.Transit
 		return transition, nil
 	}
 
+	// TRC this is the size of the JSON representation of the transition struct, in bytes
 	originalSize, errObjSize := getObjectSize(transition)
 	if errObjSize != nil {
 		e.Logger.Error(errObjSize)
 	}
+	// TRC we care because that could overflow an etcd value
 	if originalSize < e.MaxEtcdObjectSize {
 		e.Logger.WithFields(logrus.Fields{
 			"TransitionID": transition.TransitionID,
@@ -511,10 +518,12 @@ func (e *ETCDStorage) truncateAndPageTransitionIfNeeded(transition model.Transit
 	}
 
 	pageSize := e.PageSize
+	// TRC not really sure why they do this. maybe it's some hokey math to guess the slice size vis a vis JSON size?
 	if len(transition.Tasks) < pageSize && len(transition.Location) < pageSize {
 		pageSize = e.PageSize/2 + 1
 	}
 	newTranstion, pages := e.breakIntoPagesIfNeeded(transition, pageSize)
+	// TRC why does this check the size of the original transition?
 	pagedSize, errObjSize := getObjectSize(transition)
 	if errObjSize != nil {
 		e.Logger.Error(errObjSize)

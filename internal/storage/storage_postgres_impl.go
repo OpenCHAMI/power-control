@@ -86,6 +86,8 @@ func (p *PostgresStorage) DeletePowerCapOperation(taskID uuid.UUID, opID uuid.UU
 	return nil
 }
 
+// TRC StoreTransition currently sets a key from a transition prefix and the transition ID
+
 func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
 	return nil
 }
