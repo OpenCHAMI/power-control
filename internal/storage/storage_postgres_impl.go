@@ -189,19 +189,78 @@ func (p *PostgresStorage) DeletePowerCapOperation(taskID uuid.UUID, opID uuid.UU
 }
 
 func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
+	// should update conflicts be able to update anything other than active and status? technically IDK if there's any
+	// expectation otherwise and etcd would just update the whole damn thing for a given key, but changing the
+	// operation and such after creation seems wrong, and potentially catastrophic
+	exec := `INSERT INTO transitions (id, operation, deadline, created, active, expires, status)
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	ON CONFLICT (id) DO UPDATE SET active = excluded.active, status = excluded.status`
+	_, err := p.db.Exec(
+		exec,
+		transition.TransitionID,
+		transition.Operation,
+		transition.TaskDeadline,
+		transition.CreateTime,
+		transition.LastActiveTime,
+		transition.AutomaticExpirationTime,
+		transition.Status,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to store transition '%s': %w", transition.TransitionID, err)
+	}
 	return nil
 }
 
 func (p *PostgresStorage) StoreTransitionTask(op model.TransitionTask) error {
+	exec := `INSERT INTO transition_tasks (id, transition_id, operation, state, xname, reservation_key, deputy_key, status, status_desc, error)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	ON CONFLICT (id) DO UPDATE SET state = excluded.state, status = excluded.status, status_desc = excluded.status_desc, error = excluded.error`
+	_, err := p.db.Exec(
+		exec,
+		op.TaskID,
+		op.TransitionID,
+		op.Operation,
+		op.State,
+		op.Xname,
+		op.ReservationKey,
+		op.DeputyKey,
+		op.Status,
+		op.StatusDesc,
+		op.Error,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to store task '%s': %w", op.TaskID, err)
+	}
 	return nil
 }
 
+// TRC the first page here is very etcd leaky abstraction. etcd GetTransition
+// TRC returns both the complete transition and its first page if paging is
+// TRC enabled. This first page is often discarded by downstream functions. AFAICT
+// TRC it's kept only when the function will perform a TAS afterwards, because the
+// TRC TAS relies on etcd-side comparisons and won't be able to compare against the
+// TRC full transition properly. This is kinda silly, but I guess the upshot is we
+// TRC don't really need to worry about it and can just return the same object
+// TRC twice, as it will just get fed back into our own TAS.
+
 func (p *PostgresStorage) GetTransition(transitionID uuid.UUID) (transition model.Transition, transitionFirstPage model.Transition, err error) {
-	return model.Transition{}, model.Transition{}, nil
+	err = p.db.Get(&transition, "SELECT * FROM transitions WHERE id = $1", transitionID)
+	if err != nil {
+		return model.Transition{}, model.Transition{}, err
+	}
+	return transition, transition, nil
 }
 
-func (p *PostgresStorage) GetTransitionTask(transitionID uuid.UUID, taskID uuid.UUID) (model.TransitionTask, error) {
-	return model.TransitionTask{}, nil
+// TRC more etcd leakage. this needs the transition ID because you can't build
+// TRC the etcd key for a task without the transition that owns it
+
+func (p *PostgresStorage) GetTransitionTask(_ uuid.UUID, taskID uuid.UUID) (model.TransitionTask, error) {
+	var task model.TransitionTask
+	err := p.db.Get(&task, "SELECT * FROM transition_tasks WHERE id = $1", taskID)
+	if err != nil {
+		return model.TransitionTask{}, err
+	}
+	return task, nil
 }
 
 func (p *PostgresStorage) GetAllTasksForTransition(transitionID uuid.UUID) ([]model.TransitionTask, error) {
