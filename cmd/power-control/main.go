@@ -277,7 +277,18 @@ func main() {
 		tmpDistLockImplementation := &storage.ETCDLockProvider{}
 		DLOCK = tmpDistLockImplementation
 		logger.Log.Info("Distributed Lock Provider: ETCD")
+	} else if envstr == "POSTGRES" {
+		tmpStorageImplementation := &storage.PostgresStorage{}
+		DSP = tmpStorageImplementation
+		logger.Log.Info("Storage Provider: Postgres")
+		tmpDistLockImplementation := &storage.PostgresLockProvider{}
+		DLOCK = tmpDistLockImplementation
+		logger.Log.Info("Distributed Lock Provider: Postgres")
+	} else {
+		logger.Log.Errorf("Unrecognized storage type: %s", envstr)
+		os.Exit(1)
 	}
+
 	DSP.Init(logger.Log)
 	DLOCK.Init(logger.Log)
 	//TODO: there should be a Ping() to insure dist lock mechanism is alive
