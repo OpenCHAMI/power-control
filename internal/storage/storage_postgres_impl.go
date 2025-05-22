@@ -1,9 +1,11 @@
 package storage
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/OpenCHAMI/power-control/v2/internal/model"
+
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
@@ -89,10 +91,48 @@ func (p *PostgresStorage) DeletePowerCapOperation(taskID uuid.UUID, opID uuid.UU
 // TRC StoreTransition currently sets a key from a transition prefix and the transition ID
 
 func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
+	// should update conflicts be able to update anything other than active and status? technically IDK if there's any
+	// expectation otherwise and etcd would just update the whole damn thing for a given key, but changing the
+	// operation and such after creation seems wrong, and potentially catastrophic
+	exec := `INSERT INTO transitions (id, operation, deadline, created, active, expires, status)
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	ON CONFLICT (id) DO UPDATE SET active = excluded.active, status = excluded.status`
+	_, err := p.db.Exec(
+		exec,
+		transition.TransitionID,
+		transition.Operation,
+		transition.TaskDeadline,
+		transition.CreateTime,
+		transition.AutomaticExpirationTime,
+		transition.LastActiveTime,
+		transition.Status,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to store transition '%s': %w", transition.TransitionID, err)
+	}
 	return nil
 }
 
 func (p *PostgresStorage) StoreTransitionTask(op model.TransitionTask) error {
+	exec := `INSERT INTO transition_tasks (id, transition_id, operation, state, xname, reservation_key, deputy_key, status, status_desc, error)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	ON CONFLICT (id) DO UPDATE SET state = excluded.state, status = excluded.status, status_desc = excluded.status_desc, error = excluded.error`
+	_, err := p.db.Exec(
+		exec,
+		op.TaskID,
+		op.TransitionID,
+		op.Operation,
+		op.State,
+		op.Xname,
+		op.ReservationKey,
+		op.DeputyKey,
+		op.Status,
+		op.StatusDesc,
+		op.Error,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to store task '%s': %w", op.TaskID, err)
+	}
 	return nil
 }
 
