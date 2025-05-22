@@ -222,17 +222,17 @@ func main() {
 	//These are for debugging/testing
 	envstr = os.Getenv("PCS_VAULT_CA_CHAIN_PATH")
 	if envstr != "" {
-		logger.Log.Infof("Replacing default Vault CA Chain with: '%s'",envstr)
+		logger.Log.Infof("Replacing default Vault CA Chain with: '%s'", envstr)
 		hms_certs.ConfigParams.CAChainPath = envstr
 	}
 	envstr = os.Getenv("PCS_VAULT_PKI_BASE")
 	if envstr != "" {
-		logger.Log.Infof("Replacing default Vault PKI Base with: '%s'",envstr)
+		logger.Log.Infof("Replacing default Vault PKI Base with: '%s'", envstr)
 		hms_certs.ConfigParams.VaultPKIBase = envstr
 	}
 	envstr = os.Getenv("PCS_VAULT_PKI_PATH")
 	if envstr != "" {
-		logger.Log.Infof("Replacing default Vault PKI Path with: '%s'",envstr)
+		logger.Log.Infof("Replacing default Vault PKI Path with: '%s'", envstr)
 		hms_certs.ConfigParams.PKIPath = envstr
 	}
 	envstr = os.Getenv("PCS_LOG_INSECURE_FAILOVER")
