@@ -20,6 +20,8 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS transitions (
 	"id" UUID PRIMARY KEY,
 	"operation" INT NOT NULL,
@@ -27,7 +29,7 @@ CREATE TABLE IF NOT EXISTS transitions (
 	"created" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	"active" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	"expires" TIMESTAMPTZ,
-	"status" VARCHAR(255) NOT NULL,
+	"status" VARCHAR(255) NOT NULL
 	-- iscompressed omitted. AFAIK this should be handled in app-side representation of the struct
 	-- taskcounts omitted. AFAIK this is also built app-side from the tasks
 );
@@ -44,9 +46,10 @@ CREATE TABLE IF NOT EXISTS transition_tasks (
 	"deputy_key" VARCHAR(255),
 	"status" VARCHAR(255) NOT NULL,
 	"status_desc" TEXT,
-	"error" TEXT,
+	"error" TEXT
 	-- unsure if this should cascade. we probably have no reason to keep tasks around if the transition parent is gone?
-    FOREIGN KEY ("transition_id") REFERENCES transitions ("id") ON DELETE CASCADE,
+	-- TODO: PCS may not actually allow this: at least in tests it inserts tasks _before_ their associated transition
+	--FOREIGN KEY ("transition_id") REFERENCES transitions ("id") ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS transition_locations (
@@ -54,6 +57,9 @@ CREATE TABLE IF NOT EXISTS transition_locations (
 	"transition_id" UUID NOT NULL,
 	"xname" VARCHAR(255) NOT NULL,
 	-- no idea what these actually look like in practice
-	"deputy_key" VARCHAR(255),
-	FOREIGN KEY ("transition_id") REFERENCES transitions ("id") ON DELETE CASCADE,
+	"deputy_key" VARCHAR(255)
+	-- TODO: PCS may not actually allow this either. idk not testing it yet
+	--FOREIGN KEY ("transition_id") REFERENCES transitions ("id") ON DELETE CASCADE
 );
+
+COMMIT;
