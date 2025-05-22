@@ -1,6 +1,9 @@
 package storage
 
 import (
+	"database/sql"
+	"fmt"
+	"log"
 	"time"
 
 	"github.com/OpenCHAMI/power-control/v2/internal/model"
@@ -9,9 +12,99 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type PostgresConfig struct {
+	Host       string `env:"PCS_POSTGRES_HOST"`
+	User       string `env:"PCS_POSTGRES_USER"`
+	DBName     string `env:"PCS_POSTGRES_DBNAME"`
+	Password   string `env:"PCS_POSTGRES_PASSWORD"`
+	Port       uint   `env:"PCS_POSTGRES_PORT"`
+	RetryCount uint64 `env:"PCS_POSTGRES_RETRY_COUNT"`
+	RetryWait  uint64 `env:"PCS_POSTGRES_RETRY_WAIT"`
+	Insecure   bool   `env:"PCS_POSTGRES_INSECURE"`
+	Opts       string `env:"PCS_POSTGRES_OPTS"`
+}
+
+func DefaultPostgresConfig() PostgresConfig {
+	return PostgresConfig{
+		Host:       "localhost",
+		User:       "pcsuser",
+		Port:       uint(5432),
+		RetryCount: uint64(5),
+		RetryWait:  uint64(10),
+		Insecure:   false,
+		DBName:     "pcsdb",
+	}
+}
+
 type PostgresStorage struct {
 	logger *logrus.Logger
 	db     *sqlx.DB
+}
+
+func logPrintf(log *log.Logger, format string, args ...interface{}) {
+	if log != nil {
+		log.Printf(format, args...)
+	}
+}
+
+func OpenDB(config PostgresConfig, log *log.Logger) (*sql.DB, error) {
+	var (
+		err     error
+		db      *sql.DB
+		sslmode string
+		ix      = uint64(1)
+	)
+	if !config.Insecure {
+		sslmode = "verify-full"
+	} else {
+		sslmode = "disable"
+	}
+
+	connStr := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s", config.Host, config.Port, config.DBName, config.User, config.Password, sslmode)
+	fmt.Println(connStr)
+	if config.Opts != "" {
+		connStr += " " + config.Opts
+	}
+
+	// Connect to postgres, looping every retryWait seconds up to retryCount times.
+	for ; ix <= config.RetryCount; ix++ {
+		logPrintf(log, "Attempting connection to Postgres at %s:%d (attempt %d)", config.Host, config.Port, ix)
+
+		db, err = sql.Open("postgres", connStr)
+		if err != nil {
+			logPrintf(log, "ERROR: failed to open connection to Postgres at %s:%d (attempt %d, retrying in %d seconds): %v\n", config.Host, config.Port, ix, config.RetryWait, err)
+		} else {
+			break
+		}
+
+		time.Sleep(time.Duration(config.RetryWait) * time.Second)
+	}
+	if ix > config.RetryCount {
+		err = fmt.Errorf("postgres connection attempts exhausted (%d)", config.RetryCount)
+	} else {
+		logPrintf(log, "Initialized connection to Postgres database at %s:%d", config.Host, config.Port)
+	}
+
+	// Ping postgres, looping every retryWait seconds up to retryCount times.
+	for ; ix <= config.RetryCount; ix++ {
+		logPrintf(log, "Attempting to ping Postgres connection at %s:%d (attempt %d)", config.Host, config.Port, ix)
+
+		err = db.Ping()
+		if err != nil {
+			logPrintf(log, "ERROR: failed to ping Postgres at %s:%d (attempt %d, retrying in %d seconds): %v\n", config.Host, config.Port, ix, config.RetryWait, err)
+		} else {
+			break
+		}
+
+		time.Sleep(time.Duration(config.RetryWait) * time.Second)
+	}
+	if ix > config.RetryCount {
+		err = fmt.Errorf("postgres ping attempts exhausted (%d)", config.RetryCount)
+	} else {
+		logPrintf(log, "Pinged Postgres database at %s:%d", config.Host, config.Port)
+	}
+
+	return db, err
 }
 
 func (p *PostgresStorage) Init(Logger *logrus.Logger) error {

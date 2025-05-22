@@ -32,19 +32,18 @@ package main
 
 import (
 	"database/sql"
-	"flag"
 	"fmt"
 	"log"
 	"os"
-	"strconv"
-	"strings"
-	"time"
 
+	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/caarlos0/env/v11"
 	"github.com/golang-migrate/migrate/v4"
 	db "github.com/golang-migrate/migrate/v4/database"
 	pg "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -54,204 +53,107 @@ const (
 )
 
 var (
-	dbHost     = "localhost"
-	dbPort     = uint(5432)
-	dbInsecure = false
-	dbFresh    = false
-	dbName     = "pcsdb"
-	dbOpts     = ""
-	dbUser     = "pcsuser"
-	// Don't provide as default
-	dbPass string
-	// Retry interval and count for connecting to postgres.
-	dbRetryInterval = uint64(5)
-	dbRetryCount    = uint64(10)
-	dbMigrationDir  = "/migrations"
-	printVersion    = false
-	migrateStep     = uint(SCHEMA_STEPS)
-	forceStep       = -1
-	lg              = log.New(os.Stdout, "", log.Lshortfile|log.LstdFlags|log.Lmicroseconds)
-	pcsdb           *sql.DB
+	printVersion = false
+	lg           = log.New(os.Stdout, "", log.Lshortfile|log.LstdFlags|log.Lmicroseconds)
+	pcsdb        *sql.DB
 )
 
-func parseEnv(evar string, v interface{}) (ret error) {
-	if val := os.Getenv(evar); val != "" {
-		switch vp := v.(type) {
-		case *int:
-			var temp int64
-			temp, ret = strconv.ParseInt(val, 0, 64)
-			if ret == nil {
-				*vp = int(temp)
-			}
-		case *uint:
-			var temp uint64
-			temp, ret = strconv.ParseUint(val, 0, 64)
-			if ret == nil {
-				*vp = uint(temp)
-			}
-		case *string:
-			*vp = val
-		case *bool:
-			switch strings.ToLower(val) {
-			case "0", "off", "no", "false":
-				*vp = false
-			case "1", "on", "yes", "true":
-				*vp = true
-			default:
-				ret = fmt.Errorf("unrecognized bool value: '%s'", val)
-			}
-		case *[]string:
-			*vp = strings.Split(val, ",")
-		default:
-			ret = fmt.Errorf("invalid type for receiving ENV variable value %T", v)
-		}
+func parsePostgresEnvVars(config *storage.PostgresConfig) error {
+
+	err := env.Parse(config)
+	if err != nil {
+		return fmt.Errorf("Error parsing environment variables: %v", err)
 	}
-	return
+
+	return nil
 }
 
-func parseEnvVars() error {
-	var (
-		err      error = nil
-		parseErr error
-		errList  []error
-	)
-	parseErr = parseEnv("PCS_DB_INSECURE", &dbInsecure)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_INSECURE: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_DB_HOST", &dbHost)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_DB_HOST: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_DB_PORT", &dbPort)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_DB_PORT: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_DB_NAME", &dbName)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_DB_NAME: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_DB_OPTS", &dbOpts)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_DB_OPTS: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_DB_USER", &dbUser)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_DB_USER: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_DB_PASS", &dbPass)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_DB_PASS: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_DB_STEP", &migrateStep)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_DB_STEP: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_DB_FORCESTEP", &forceStep)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_DB_FORCESTEP: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_DB_MIGRATIONDIR", &dbMigrationDir)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_DB_MIGRATIONDIR: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_DB_FRESH", &dbFresh)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_DB_FRESH: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_SQL_RETRY_WAIT", &dbRetryInterval)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_SQL_RETRY_WAIT: %q", parseErr))
-	}
-	parseErr = parseEnv("PCS_SQL_RETRY_COUNT", &dbRetryCount)
-	if parseErr != nil {
-		errList = append(errList, fmt.Errorf("PCS_SQL_RETRY_COUNT: %q", parseErr))
-	}
-
-	if len(errList) > 0 {
-		err = fmt.Errorf("Error(s) parsing environment variables: %v", errList)
-	}
-
-	return err
+type SchemaConfig struct {
+	Step         uint   `env:"PCS_SCHEMA_STEP"`
+	ForceStep    int    `env:"PCS_SCHEMA_FORCE_STEP"`
+	Fresh        bool   `env:"PCS_SCHEMA_FRESH"`
+	MigrationDir string `env:"PCS_SCHEMA_MIGRATION_DIR"`
 }
 
-func parseCmdLine() {
-	flag.StringVar(&dbHost, "db-host", dbHost, "(PCS_DB_HOST) Postgres host as IP address or name")
-	flag.StringVar(&dbUser, "db-user", dbUser, "(PCS_DB_USER) Postgres username")
-	flag.StringVar(&dbPass, "db-password", dbPass, "(PCS_DB_PASS) Postgres password")
-	flag.StringVar(&dbName, "db-name", dbName, "(PCS_DB_NAME) Postgres database name")
-	flag.StringVar(&dbOpts, "db-opts", dbOpts, "(PCS_DB_OPTS) Postgres database options")
-	flag.StringVar(&dbMigrationDir, "db-migrations", dbMigrationDir, "(PCS_MIGRATIONDIR) Postgres migrations directory path")
-	flag.IntVar(&forceStep, "db-force-step", forceStep, "(PCS_DB_FORCESTEP) Migration step number to force migrate to before performing migration")
-	flag.UintVar(&dbPort, "db-port", dbPort, "(PCS_DB_PORT) Postgres port")
-	flag.UintVar(&migrateStep, "db-step", migrateStep, "(PCS_DB_STEP) Migration step number to migrate to")
-	flag.Uint64Var(&dbRetryCount, "db-retry-count", dbRetryCount, "(PCS_SQL_RETRY_COUNT) Number of times to retry connecting to Postgres database before giving up")
-	flag.Uint64Var(&dbRetryInterval, "db-retry-interval", dbRetryInterval, "(PCS_SQL_RETRY_WAIT) Seconds to wait between retrying connection to Postgres")
-	flag.BoolVar(&dbInsecure, "db-insecure", dbInsecure, "(PCS_INSECURE) Don't enforce certificate authority for Postgres")
-	flag.BoolVar(&dbFresh, "db-fresh", dbFresh, "(PCS_DB_FRESH) Revert all schemas before migration (drops all PCS-related tables)")
-	flag.BoolVar(&printVersion, "version", printVersion, "Print version and exit")
-	flag.Parse()
+func parseSchemaEnvVars(config *SchemaConfig) error {
+	err := env.Parse(config)
+	if err != nil {
+
+		return fmt.Errorf("Error parsing environment variables: %v", err)
+	}
+
+	return nil
 }
 
-func sqlOpen(host string, port uint, dbName, user, password string, ssl bool, extraDbOpts string, retryCount, retryWait uint64) (*sql.DB, error) {
-	var (
-		err     error
-		bddb    *sql.DB
-		sslmode string
-		ix      = uint64(1)
-	)
-	if ssl {
-		sslmode = "verify-full"
-	} else {
-		sslmode = "disable"
+func parseEnvVars(postgresConfig *storage.PostgresConfig, schemaConfig *SchemaConfig) error {
+	err := parsePostgresEnvVars(postgresConfig)
+	if err != nil {
+		return fmt.Errorf("Error parsing Postgres environment variables: %v", err)
 	}
 
-	fmt.Printf("sslmode: %s\n", sslmode)
-
-	connStr := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s", host, port, dbName, user, password, sslmode)
-	fmt.Printf("connStr: %s\n", connStr)
-	if extraDbOpts != "" {
-		connStr += " " + extraDbOpts
-	}
-	lg.Println(connStr)
-
-	// Connect to postgres, looping every retryWait seconds up to retryCount times.
-	for ; ix <= retryCount; ix++ {
-		lg.Printf("Attempting connection to Postgres at %s:%d (attempt %d)", host, port, ix)
-		bddb, err = sql.Open("postgres", connStr)
-		if err != nil {
-			lg.Printf("ERROR: failed to open connection to Postgres at %s:%d (attempt %d, retrying in %d seconds): %v\n", host, port, ix, retryWait, err)
-		} else {
-			break
-		}
-
-		time.Sleep(time.Duration(retryWait) * time.Second)
-	}
-	if ix > retryCount {
-		err = fmt.Errorf("postgres connection attempts exhausted (%d)", retryCount)
-	} else {
-		lg.Printf("Initialized connection to Postgres database at %s:%d", host, port)
+	err = parseSchemaEnvVars(schemaConfig)
+	if err != nil {
+		return fmt.Errorf("Error parsing Schema environment variables: %v", err)
 	}
 
-	// Ping postgres, looping every retryWait seconds up to retryCount times.
-	for ; ix <= retryCount; ix++ {
-		lg.Printf("Attempting to ping Postgres connection at %s:%d (attempt %d)", host, port, ix)
-		err = bddb.Ping()
-		if err != nil {
-			lg.Printf("ERROR: failed to ping Postgres at %s:%d (attempt %d, retrying in %d seconds): %v\n", host, port, ix, retryWait, err)
-		} else {
-			break
-		}
+	return nil
+}
 
-		time.Sleep(time.Duration(retryWait) * time.Second)
-	}
-	if ix > retryCount {
-		err = fmt.Errorf("postgres ping attempts exhausted (%d)", retryCount)
-	} else {
-		lg.Printf("Pinged Postgres database at %s:%d", host, port)
+func addPostgresFlags(command *cobra.Command, config *storage.PostgresConfig) {
+	command.Flags().StringVarP(&config.Host, "postgres-host", "i", config.Host, "(PCS_POSTGRES_HOST) Postgres host as IP address or name")
+	command.Flags().StringVarP(&config.User, "postgres-user", "u", config.User, "(PCS_POSTGRES_USER) Postgres username")
+	command.Flags().StringVarP(&config.Password, "postgres-password", "p", config.Password, "(PCS_POSTGRES_PASSWORD) Postgres password")
+	command.Flags().StringVarP(&config.DBName, "postgres-dbname", "n", config.DBName, "(PCS_POSTGRES_DBNAME) Postgres database name")
+	command.Flags().StringVarP(&config.Opts, "postgres-opts", "o", config.Opts, "(PCS_POSTGRES_OPTS) Postgres database options")
+	command.Flags().UintVarP(&config.Port, "postgres-port", "r", config.Port, "(PCS_POSTGRES_PORT) Postgres port")
+	command.Flags().Uint64VarP(&config.RetryCount, "postgres-retry-count", "c", config.RetryCount, "(PCS_POSTGRES_RETRY_COUNT) Number of times to retry connecting to Postgres database before giving up")
+	command.Flags().Uint64VarP(&config.RetryWait, "postgres-retry-wait", "w", config.RetryWait, "(PCS_POSTGRES_RETRY_WAIT) Seconds to wait between retrying connection to Postgres")
+	command.Flags().BoolVarP(&config.Insecure, "postgres-insecure", "s", config.Insecure, "(PCS_POSTGRES_INSECURE) Don't enforce certificate authority for Postgres")
+}
+
+func addSchemaFlags(command *cobra.Command, config *SchemaConfig) {
+	command.Flags().UintVarP(&config.Step, "schema-step", "t", config.Step, "(PCS_SCHEMA_STEP) Migration step to apply")
+	command.Flags().IntVarP(&config.ForceStep, "schema-force-step", "f", config.ForceStep, "(PCS_SCHEMA_FORCE_STEP) Force migration to a specific step")
+	command.Flags().BoolVarP(&config.Fresh, "schema-fresh", "e", config.Fresh, "(PCS_SCHEMA_FRESH) Drop all tables and start fresh")
+	command.Flags().StringVarP(&config.MigrationDir, "schema-migrations", "d", config.MigrationDir, "(PCS_SCHEMA_MIGRATION_DIR) Directory for migration files")
+}
+
+func createCommand() *cobra.Command {
+	var schemaConfig SchemaConfig
+	postgresConfig := storage.DefaultPostgresConfig()
+
+	cmd := &cobra.Command{
+		Use:   "power-control-init",
+		Short: "Initialize and migrate the PCS database",
+		Long:  "Initialize and migrate the PCS database",
+		Run: func(cmd *cobra.Command, args []string) {
+			if printVersion {
+				fmt.Printf("Version: %s, Schema Version: %d\n", APP_VERSION, SCHEMA_VERSION)
+				os.Exit(0)
+			}
+
+			err := parseEnvVars(&postgresConfig, &schemaConfig)
+			if err != nil {
+				lg.Println(err)
+				lg.Println("WARNING: Ignoring environment variables with errors.")
+			}
+
+			if postgresConfig.Password == "" {
+				lg.Printf("Missing DB password")
+				cmd.Help()
+				os.Exit(1)
+			}
+
+			migrateSchema(schemaConfig, postgresConfig, err)
+		},
 	}
 
-	return bddb, err
+	addPostgresFlags(cmd, &postgresConfig)
+	addSchemaFlags(cmd, &schemaConfig)
+
+	cmd.Flags().BoolVarP(&printVersion, "version", "v", false, "Print version and exit")
+
+	return cmd
 }
 
 func sqlClose() {
@@ -261,50 +163,29 @@ func sqlClose() {
 	}
 }
 
-func main() {
-	var err error
-
-	err = parseEnvVars()
-	if err != nil {
-		lg.Println(err)
-		lg.Println("WARNING: Ignoring environment variables with errors.")
-	}
-
-	parseCmdLine()
-
-	if printVersion {
-		fmt.Printf("Version: %s, Schema Version: %d\n", APP_VERSION, SCHEMA_VERSION)
-		os.Exit(0)
-	}
-
+func migrateSchema(schemaConfig SchemaConfig, postgresConfig storage.PostgresConfig, err error) {
 	lg.Printf("pcs-init: Starting...")
 	lg.Printf("pcs-init: Version: %s, Schema Version: %d, Steps: %d, Desired Step: %d",
-		APP_VERSION, SCHEMA_VERSION, SCHEMA_STEPS, migrateStep)
+		APP_VERSION, SCHEMA_VERSION, SCHEMA_STEPS, schemaConfig.Step)
 
 	// Check vars.
-	if forceStep < 0 || forceStep > SCHEMA_STEPS {
-		if forceStep != -1 {
+	if schemaConfig.ForceStep < 0 || schemaConfig.ForceStep > SCHEMA_STEPS {
+		if schemaConfig.ForceStep != -1 {
 			// A negative value was passed (-1 is noop).
-			lg.Fatalf("db-force-step value %d out of range, should be between (inclusive) 0 and %d", forceStep, SCHEMA_STEPS)
+			lg.Fatalf("db-force-step value %d out of range, should be between (inclusive) 0 and %d", schemaConfig.ForceStep, SCHEMA_STEPS)
 		}
 	}
 
-	if dbInsecure {
+	if postgresConfig.Insecure {
 		lg.Printf("WARNING: Using insecure connection to postgres.")
 	}
 
-	if dbPass == "" {
-		lg.Printf("Missing DB password")
-		flag.Usage()
-		os.Exit(1)
-	}
-
 	// Open connection to postgres.
-	pcsdb, err = sqlOpen(dbHost, dbPort, dbName, dbUser, dbPass, !dbInsecure, dbOpts, dbRetryCount, dbRetryInterval)
+	pcsdb, err = storage.OpenDB(postgresConfig, lg)
 	if err != nil {
-		lg.Fatalf("ERROR: Access to Postgres database at %s:%d failed: %v\n", dbHost, dbPort, err)
+		lg.Fatalf("ERROR: Access to Postgres database at %s:%d failed: %v\n", postgresConfig.Host, postgresConfig.Port, err)
 	}
-	lg.Printf("Successfully connected to Postgres at %s:%d", dbHost, dbPort)
+	lg.Printf("Successfully connected to Postgres at %s:%d", postgresConfig.Host, postgresConfig.Port)
 	defer sqlClose()
 
 	// Create instance of postgres driver to be used in migration instance creation.
@@ -318,8 +199,8 @@ func main() {
 	// Create migration instance pointing to migrations directory.
 	var m *migrate.Migrate
 	m, err = migrate.NewWithDatabaseInstance(
-		"file://"+dbMigrationDir,
-		dbName,
+		"file://"+schemaConfig.MigrationDir,
+		postgresConfig.DBName,
 		pgdriver)
 	if err != nil {
 		lg.Fatalf("ERROR: Failed to create migration: %v", err)
@@ -330,7 +211,7 @@ func main() {
 	lg.Printf("Successfully created migration instance")
 
 	// If --fresh specified, perform all down migrations (drop tables).
-	if dbFresh {
+	if schemaConfig.Fresh {
 		err = m.Down()
 		if err != nil {
 			lg.Fatalf("ERROR: migration.Down() failed: %v", err)
@@ -340,12 +221,12 @@ func main() {
 
 	// Force specific migration step if specified (doesn't matter if dirty, since
 	// the step is user-specified).
-	if forceStep >= 0 {
-		err = m.Force(forceStep)
+	if schemaConfig.ForceStep >= 0 {
+		err = m.Force(schemaConfig.ForceStep)
 		if err != nil {
-			lg.Fatalf("ERROR: migration.Force(%d) failed: %v", forceStep, err)
+			lg.Fatalf("ERROR: migration.Force(%d) failed: %v", schemaConfig.ForceStep, err)
 		}
-		lg.Printf("migration.Force(%d) succeeded", forceStep)
+		lg.Printf("migration.Force(%d) succeeded", schemaConfig.ForceStep)
 	}
 
 	// Check if "dirty" (version is > 0), force current version to clear dirty flag
@@ -364,7 +245,7 @@ func main() {
 	} else {
 		lg.Printf("Migration at step %d (dirty=%t)", version, dirty)
 	}
-	if dirty && forceStep < 0 {
+	if dirty && schemaConfig.ForceStep < 0 {
 		lg.Printf("Migration is dirty and no --db-force-step specified, forcing current version")
 		// Migration is dirty and no version to force was specified.
 		// Force the current version to clear the dirty flag.
@@ -387,15 +268,15 @@ func main() {
 		} else {
 			lg.Printf("Migration: Up() succeeded")
 		}
-	} else if version != migrateStep {
+	} else if version != schemaConfig.Step {
 		// Current version does not match user-specified version.
 		// Migrate up or down from current version to target version.
-		if version < migrateStep {
-			lg.Printf("Migration: DB at version %d, target version %d; upgrading", version, migrateStep)
+		if version < uint(schemaConfig.Step) {
+			lg.Printf("Migration: DB at version %d, target version %d; upgrading", version, schemaConfig.Step)
 		} else {
-			lg.Printf("Migration: DB at version %d, target version %d; downgrading", version, migrateStep)
+			lg.Printf("Migration: DB at version %d, target version %d; downgrading", version, schemaConfig.Step)
 		}
-		err = m.Migrate(migrateStep)
+		err = m.Migrate(schemaConfig.Step)
 		if err == migrate.ErrNoChange {
 			lg.Printf("Migration: No changes applied (none needed)")
 		} else if err != nil {
@@ -416,5 +297,12 @@ func main() {
 		lg.Fatalf("ERROR: migration.Version() failed: %v", err)
 	} else {
 		lg.Printf("Migration at version %d (dirty=%t)", version, dirty)
+	}
+}
+
+func main() {
+	cmd := createCommand()
+	if err := cmd.Execute(); err != nil {
+		lg.Fatalf("ERROR: %v", err)
 	}
 }
