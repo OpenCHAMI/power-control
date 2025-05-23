@@ -43,8 +43,8 @@ import (
 	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
-	"github.com/namsral/flag"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 // Default Port to use
@@ -88,7 +88,25 @@ var (
 	jwksFetchInterval   int = 5
 )
 
-func main() {
+type pcsConfig struct {
+	vaultEnabled       bool
+	vaultKeypath       string
+	stateManagerServer string
+	hsmLockEnabled     bool
+	runControl         bool
+	credCacheDuration  int
+	maxNumCompleted    int
+	expireTimeMins     int
+	maxMessageLength   int
+}
+
+type etcdConfig struct {
+	etcdDisableSizeChecks bool
+	etcdPageSize          int
+	etcdMaxObjectSize     int
+}
+
+func run(pcs pcsConfig, etcd etcdConfig, postgres storage.PostgresConfig) {
 
 	var err error
 	logger.Init()
@@ -102,51 +120,13 @@ func main() {
 
 	logger.Log.Info("Service/Instance name: " + serviceName)
 
-	var VaultEnabled bool
-	var VaultKeypath string
-	var StateManagerServer string
-	var hsmlockEnabled bool = true
-	var runControl bool = false     //noting to run yet!
-	var credCacheDuration int = 600 //In seconds. 10 mins?
-	var maxNumCompleted int
-	var expireTimeMins int
-	var etcdDisableSizeChecks bool
-	var etcdPageSize int
-	var maxMessageLength int
-	var etcdMaxObjectSize int
-
 	srv := &http.Server{Addr: defaultPORT}
 
-	///////////////////////////////
-	//ENVIRONMENT PARSING
-	//////////////////////////////
-
-	flag.StringVar(&StateManagerServer, "sms_server", defaultSMSServer, "SMS Server")
-
-	flag.BoolVar(&runControl, "run_control", runControl, "run control loop; false runs API only") //this was a flag useful for dev work
-	flag.BoolVar(&hsmlockEnabled, "hsmlock_enabled", true, "Use HSM Locking")                     // This was a flag useful for dev work
-	flag.BoolVar(&VaultEnabled, "vault_enabled", true, "Should vault be used for credentials?")
-	flag.StringVar(&VaultKeypath, "vault_keypath", "secret/hms-creds",
-		"Keypath for Vault credentials.")
-	flag.IntVar(&credCacheDuration, "cred_cache_duration", 600,
-		"Duration in seconds to cache vault credentials.")
-
-	flag.IntVar(&maxNumCompleted, "max_num_completed", defaultMaxNumCompleted, "Maximum number of completed records to keep.")
-	flag.IntVar(&expireTimeMins, "expire_time_mins", defaultExpireTimeMins, "The time, in mins, to keep completed records.")
-
-	flag.BoolVar(&etcdDisableSizeChecks, "etcd_disable_size_checks", false, "Disables checking object size before storing and doing message truncation and paging.")
-	flag.IntVar(&etcdPageSize, "etcd_page_size", storage.DefaultEtcdPageSize, "The maximum number of records to put in each etcd entry.")
-	flag.IntVar(&maxMessageLength, "max_transition_message_length", storage.DefaultMaxMessageLen, "The maximum length of messages per task in a transition.")
-	flag.IntVar(&etcdMaxObjectSize, "etcd_max_object_size", storage.DefaultMaxEtcdObjectSize, "The maximum data size in bytes for objects in etcd.")
-	flag.StringVar(&jwksURL, "jwks-url", "", "Set the JWKS URL to fetch public key for validation")
-
-	flag.Parse()
-
-	logger.Log.Info("SMS Server: " + StateManagerServer)
-	logger.Log.Info("HSM Lock Enabled: ", hsmlockEnabled)
-	logger.Log.Info("Vault Enabled: ", VaultEnabled)
-	logger.Log.Info("Max Completed Records: ", maxNumCompleted)
-	logger.Log.Info("Completed Record Expire Time: ", expireTimeMins)
+	logger.Log.Info("SMS Server: " + pcs.stateManagerServer)
+	logger.Log.Info("HSM Lock Enabled: ", pcs.hsmLockEnabled)
+	logger.Log.Info("Vault Enabled: ", pcs.vaultEnabled)
+	logger.Log.Info("Max Completed Records: ", pcs.maxNumCompleted)
+	logger.Log.Info("Completed Record Expire Time: ", pcs.expireTimeMins)
 	logger.Log.SetReportCaller(true)
 
 	///////////////////////////////
@@ -254,10 +234,10 @@ func main() {
 	if envstr == "" || envstr == "MEMORY" {
 		tmpStorageImplementation := &storage.MEMStorage{
 			Logger:            logger.Log,
-			DisableSizeChecks: etcdDisableSizeChecks,
-			PageSize:          etcdPageSize,
-			MaxMessageLen:     maxMessageLength,
-			MaxEtcdObjectSize: etcdMaxObjectSize,
+			DisableSizeChecks: etcd.etcdDisableSizeChecks,
+			PageSize:          etcd.etcdPageSize,
+			MaxMessageLen:     pcs.maxMessageLength,
+			MaxEtcdObjectSize: etcd.etcdMaxObjectSize,
 		}
 		DSP = tmpStorageImplementation
 		logger.Log.Info("Storage Provider: In Memory")
@@ -267,10 +247,10 @@ func main() {
 	} else if envstr == "ETCD" {
 		tmpStorageImplementation := &storage.ETCDStorage{
 			Logger:            logger.Log,
-			DisableSizeChecks: etcdDisableSizeChecks,
-			PageSize:          etcdPageSize,
-			MaxMessageLen:     maxMessageLength,
-			MaxEtcdObjectSize: etcdMaxObjectSize,
+			DisableSizeChecks: etcd.etcdDisableSizeChecks,
+			PageSize:          etcd.etcdPageSize,
+			MaxMessageLen:     pcs.maxMessageLength,
+			MaxEtcdObjectSize: etcd.etcdMaxObjectSize,
 		}
 		DSP = tmpStorageImplementation
 		logger.Log.Info("Storage Provider: ETCD")
@@ -299,8 +279,8 @@ func main() {
 		SvcName:       serviceName,
 		Logger:        logger.Log,
 		Running:       &Running,
-		LockEnabled:   hsmlockEnabled,
-		SMUrl:         StateManagerServer,
+		LockEnabled:   pcs.hsmLockEnabled,
+		SMUrl:         pcs.stateManagerServer,
 		SVCHttpClient: svcClient,
 	}
 	HSM.Init(&hsmGlob)
@@ -310,9 +290,9 @@ func main() {
 	tmpCS := &credstore.VAULTv0{}
 
 	CS = tmpCS
-	if VaultEnabled {
+	if pcs.vaultEnabled {
 		var credStoreGlob credstore.CREDSTORE_GLOBALS
-		credStoreGlob.NewGlobals(logger.Log, &Running, credCacheDuration, VaultKeypath)
+		credStoreGlob.NewGlobals(logger.Log, &Running, pcs.credCacheDuration, pcs.vaultKeypath)
 		CS.Init(&credStoreGlob)
 	}
 
@@ -325,8 +305,8 @@ func main() {
 	//DOMAIN CONFIGURATION
 	var domainGlobals domain.DOMAIN_GLOBALS
 	domainGlobals.NewGlobals(&BaseTRSTask, &TLOC_rf, &TLOC_svc, rfClient, svcClient,
-		rfClientLock, &Running, &DSP, &HSM, VaultEnabled,
-		&CS, &DLOCK, maxNumCompleted, expireTimeMins, podName)
+		rfClientLock, &Running, &DSP, &HSM, pcs.vaultEnabled,
+		&CS, &DLOCK, pcs.maxNumCompleted, pcs.expireTimeMins, podName)
 
 	//Wait for vault PKI to respond for CA bundle.  Once this happens, re-do
 	//the globals.  This goroutine will run forever checking if the CA trust
@@ -541,7 +521,7 @@ func main() {
 
 	//Master Control
 
-	if runControl {
+	if pcs.runControl {
 		logger.Log.Info("Starting control loop")
 		//Go start control loop!
 	} else {
@@ -559,6 +539,78 @@ func main() {
 	logger.Log.Info("HTTP server shutdown, waiting for idle connection to close...")
 	<-idleConnsClosed
 	logger.Log.Info("Done. Exiting.")
+
+}
+
+func parsePostgresEnvVars(config *storage.PostgresConfig) error {
+	err := env.Parse(config)
+	if err != nil {
+		return fmt.Errorf("Error parsing environment variables: %v", err)
+	}
+
+	return nil
+}
+
+func main() {
+	pcs := pcsConfig{
+		hsmLockEnabled:    true,
+		runControl:        false,
+		credCacheDuration: 600,
+	}
+	postgres := storage.DefaultPostgresConfig()
+	var etcd etcdConfig
+
+	// Parse environment variables
+	err := parsePostgresEnvVars(&postgres)
+	if err != nil {
+		logger.Log.Errorf("Error parsing Postgres environment variables: %v", err)
+		os.Exit(1)
+	}
+
+	///////////////////////////////
+	//ENVIRONMENT PARSING
+	//////////////////////////////
+	cmd := &cobra.Command{
+		Use:   "power-control",
+		Short: "Power Control Service",
+		Long:  "Power Control Service",
+		Run: func(cmd *cobra.Command, args []string) {
+			run(pcs, etcd, postgres)
+		},
+	}
+
+	cmd.Flags().StringVar(&pcs.stateManagerServer, "sms_server", defaultSMSServer, "SMS Server")
+	cmd.Flags().BoolVar(&pcs.runControl, "run_control", pcs.runControl, "run control loop; false runs API only") //this was a flag useful for dev work
+	cmd.Flags().BoolVar(&pcs.hsmLockEnabled, "hsmlock_enabled", true, "Use HSM Locking")                         // This was a flag useful for dev work
+	cmd.Flags().BoolVar(&pcs.vaultEnabled, "vault_enabled", true, "Should vault be used for credentials?")
+	cmd.Flags().StringVar(&pcs.vaultKeypath, "vault_keypath", "secret/hms-creds",
+		"Keypath for Vault credentials.")
+	cmd.Flags().IntVar(&pcs.credCacheDuration, "cred_cache_duration", 600,
+		"Duration in seconds to cache vault credentials.")
+
+	cmd.Flags().IntVar(&pcs.maxNumCompleted, "max_num_completed", defaultMaxNumCompleted, "Maximum number of completed records to keep.")
+	cmd.Flags().IntVar(&pcs.expireTimeMins, "expire_time_mins", defaultExpireTimeMins, "The time, in mins, to keep completed records.")
+	cmd.Flags().BoolVar(&etcd.etcdDisableSizeChecks, "etcd_disable_size_checks", false, "Disables checking object size before storing and doing message truncation and paging.")
+	cmd.Flags().IntVar(&etcd.etcdPageSize, "etcd_page_size", storage.DefaultEtcdPageSize, "The maximum number of records to put in each etcd entry.")
+	cmd.Flags().IntVar(&pcs.maxMessageLength, "max_transition_message_length", storage.DefaultMaxMessageLen, "The maximum length of messages per task in a transition.")
+	cmd.Flags().IntVar(&etcd.etcdMaxObjectSize, "etcd_max_object_size", storage.DefaultMaxEtcdObjectSize, "The maximum data size in bytes for objects in etcd.")
+	cmd.Flags().StringVar(&jwksURL, "jwks-url", "", "Set the JWKS URL to fetch public key for validation")
+
+	// Postgres flags
+	cmd.Flags().StringVarP(&postgres.Host, "postgres_host", "", postgres.Host, "(PCS_POSTGRES_HOST) Postgres host as IP address or name")
+	cmd.Flags().StringVarP(&postgres.User, "postgres_user", "", postgres.User, "(PCS_POSTGRES_USER) Postgres username")
+	cmd.Flags().StringVarP(&postgres.Password, "postgres_password", "", postgres.Password, "(PCS_POSTGRES_PASSWORD) Postgres password")
+	cmd.Flags().StringVarP(&postgres.DBName, "postgres_dbname", "", postgres.DBName, "(PCS_POSTGRES_DBNAME) Postgres database name")
+	cmd.Flags().StringVarP(&postgres.Opts, "postgres_opts", "", postgres.Opts, "(PCS_POSTGRES_OPTS) Postgres database options")
+	cmd.Flags().UintVarP(&postgres.Port, "postgres_port", "", postgres.Port, "(PCS_POSTGRES_PORT) Postgres port")
+	cmd.Flags().Uint64VarP(&postgres.RetryCount, "postgres_retry_count", "", postgres.RetryCount, "(PCS_POSTGRES_RETRY_COUNT) Number of times to retry connecting to Postgres database before giving up")
+	cmd.Flags().Uint64VarP(&postgres.RetryWait, "postgres_retry_wait", "", postgres.RetryWait, "(PCS_POSTGRES_RETRY_WAIT) Seconds to wait between retrying connection to Postgres")
+	cmd.Flags().BoolVarP(&postgres.Insecure, "postgres_insecure", "", postgres.Insecure, "(PCS_POSTGRES_INSECURE) Don't enforce certificate authority for Postgres")
+
+	if err := cmd.Execute(); err != nil {
+		logger.Log.Errorf("Error executing command: %v", err)
+		os.Exit(1)
+	}
 }
 
 func doRest(serverPort string) {
