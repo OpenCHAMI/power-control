@@ -33,8 +33,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
+	"path/filepath"
+	"runtime"
+	"time"
 
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
 	"github.com/caarlos0/env/v11"
@@ -43,6 +45,7 @@ import (
 	pg "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -54,7 +57,7 @@ const (
 
 var (
 	printVersion = false
-	lg           = log.New(os.Stdout, "", log.Lshortfile|log.LstdFlags|log.Lmicroseconds)
+	lg           *logrus.Logger
 	pcsdb        *sql.DB
 )
 
@@ -122,6 +125,12 @@ func createCommand() *cobra.Command {
 	var schemaConfig SchemaConfig
 	postgresConfig := storage.DefaultPostgresConfig()
 
+	err := parseEnvVars(&postgresConfig, &schemaConfig)
+	if err != nil {
+		lg.Println(err)
+		lg.Println("WARNING: Ignoring environment variables with errors.")
+	}
+
 	cmd := &cobra.Command{
 		Use:   "power-control-init",
 		Short: "Initialize and migrate the PCS database",
@@ -130,12 +139,6 @@ func createCommand() *cobra.Command {
 			if printVersion {
 				fmt.Printf("Version: %s, Schema Version: %d\n", APP_VERSION, SCHEMA_VERSION)
 				os.Exit(0)
-			}
-
-			err := parseEnvVars(&postgresConfig, &schemaConfig)
-			if err != nil {
-				lg.Println(err)
-				lg.Println("WARNING: Ignoring environment variables with errors.")
 			}
 
 			if postgresConfig.Password == "" {
@@ -301,6 +304,23 @@ func migrateSchema(schemaConfig SchemaConfig, postgresConfig storage.PostgresCon
 }
 
 func main() {
+	lg = logrus.New()
+	lg.SetOutput(os.Stdout)
+	lg.SetReportCaller(true)
+
+	// Create formatter for logrus.
+	formatter := &logrus.TextFormatter{
+		FullTimestamp:    true,
+		TimestampFormat:  time.RFC3339Nano,
+		DisableQuote:     true,
+		DisableTimestamp: false,
+		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+			filename := filepath.Base(f.File)
+			return fmt.Sprintf("%s:%d", filename, f.Line), ""
+		},
+	}
+	lg.SetFormatter(formatter)
+
 	cmd := createCommand()
 	if err := cmd.Execute(); err != nil {
 		lg.Fatalf("ERROR: %v", err)

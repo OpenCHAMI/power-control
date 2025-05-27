@@ -26,6 +26,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -43,6 +44,7 @@ import (
 	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/caarlos0/env/v11"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -258,7 +260,9 @@ func run(pcs pcsConfig, etcd etcdConfig, postgres storage.PostgresConfig) {
 		DLOCK = tmpDistLockImplementation
 		logger.Log.Info("Distributed Lock Provider: ETCD")
 	} else if envstr == "POSTGRES" {
-		tmpStorageImplementation := &storage.PostgresStorage{}
+		tmpStorageImplementation := &storage.PostgresStorage{
+			Config: postgres,
+		}
 		DSP = tmpStorageImplementation
 		logger.Log.Info("Storage Provider: Postgres")
 		tmpDistLockImplementation := &storage.PostgresLockProvider{}
@@ -269,8 +273,20 @@ func run(pcs pcsConfig, etcd etcdConfig, postgres storage.PostgresConfig) {
 		os.Exit(1)
 	}
 
-	DSP.Init(logger.Log)
-	DLOCK.Init(logger.Log)
+	logger.Log.Info("Initializing storage provider")
+
+	err = DSP.Init(logger.Log)
+	if err != nil {
+		logger.Log.Errorf("Error initializing storage provider: %v", err)
+		os.Exit(1)
+	}
+
+	err = DLOCK.Init(logger.Log)
+	if err != nil {
+		logger.Log.Errorf("Error initializing distributed lock provider: %v", err)
+		os.Exit(1)
+	}
+
 	//TODO: there should be a Ping() to insure dist lock mechanism is alive
 
 	//Hardware State Manager CONFIGURATION
