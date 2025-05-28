@@ -10,6 +10,7 @@ services:
       - SMS_SERVER=http://smd:27779
       - VAULT_ENABLED=true
       - VAULT_KEYPATH=hms-creds
+      - STORAGE
     depends_on:
       - etcd
       - smd

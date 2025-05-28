@@ -35,7 +35,6 @@ ENV SMS_SERVER="http://smd:27779"
 ENV LOG_LEVEL="INFO"
 ENV SERVICE_RESERVATION_VERBOSITY="ERROR"
 ENV TRS_IMPLEMENTATION="LOCAL"
-ENV STORAGE="BOTH"
 ENV ETCD_HOST="etcd"
 ENV ETCD_PORT="2379"
 ENV HSMLOCK_ENABLED="true"
@@ -59,6 +58,7 @@ COPY go.mod $GOPATH/src/github.com/OpenCHAMI/power-control/v2/go.mod
 COPY go.sum $GOPATH/src/github.com/OpenCHAMI/power-control/v2/go.sum
 
 CMD set -ex \
+    && echo "Testing with ${STORAGE} storage" \
     && ./scripts/wait-for-discovery.sh \
     && go version \
     && cd $GOPATH/src/github.com/OpenCHAMI/power-control/v2/ \
