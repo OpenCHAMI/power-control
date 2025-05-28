@@ -1,95 +1,184 @@
 package storage
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	testetcd "github.com/testcontainers/testcontainers-go/modules/etcd"
+	testpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func storageProviders(t *testing.T) map[string]StorageProvider {
-	providers := map[string]StorageProvider{
-		"MEMORY": &MEMStorage{},
-	}
+const (
+	TEST_FAIL_CODE = 136
+)
 
-	if (os.Getenv("ETCD_HOST") != "") && (os.Getenv("ETCD_PORT") != "") {
-		providers["ETCD"] = &ETCDStorage{}
-	}
+var (
+	storageProvider  StorageProvider
+	distLockProvider DistributedLockProvider
+)
 
-	if (os.Getenv("POSTGRES_HOST") != "") && (os.Getenv("POSTGRES_PORT") != "") {
-		providers["POSTGRES"] = &PostgresStorage{}
-	}
+func startPostgresContainer() (testcontainers.Container, error) {
+	dbName := "pcsdb"
+	username := "pcsuser"
+	password := "nothingtoseehere"
 
-	return providers
+	ctx := context.Background()
+	ctr, err := testpostgres.Run(ctx,
+		"postgres:16-alpine",
+		testpostgres.WithDatabase(dbName),
+		testpostgres.WithUsername(username),
+		testpostgres.WithPassword(password),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(5*time.Second)),
+	)
+
+	return ctr, err
 }
 
-func distLockProviders(t *testing.T) map[string]DistributedLockProvider {
-	providers := map[string]DistributedLockProvider{
-		"MEMORY": &MEMLockProvider{},
-	}
+func startEtcdContainer() (testcontainers.Container, error) {
+	ctx := context.Background()
+	ctr, err := testetcd.Run(ctx,
+		"quay.io/coreos/etcd:v3.5.17",
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("ready to serve client requests").
+				WithStartupTimeout(5*time.Second)),
+	)
 
-	if (os.Getenv("ETCD_HOST") != "") && (os.Getenv("ETCD_PORT") != "") {
-		providers["ETCD"] = &ETCDLockProvider{}
-	}
-
-	if (os.Getenv("POSTGRES_HOST") != "") && (os.Getenv("POSTGRES_PORT") != "") {
-		providers["POSTGRES"] = &PostgresLockProvider{}
-	}
-
-	return providers
+	return ctr, err
 }
 
-func TestInit(t *testing.T) {
-	for name, dl := range distLockProviders(t) {
-		err := dl.Init(nil)
-		if err != nil {
-			t.Errorf("DistLock Init() failed: %v for provider: %s", err, name)
+func startStorageBackendContainer() (testcontainers.Container, error) {
+	storage := os.Getenv("STORAGE")
+	switch storage {
+	case "POSTGRES":
+		return startPostgresContainer()
+	case "ETCD":
+		return startEtcdContainer()
+	default:
+		return nil, nil // No container needed for MEMORY storage
+	}
+}
+
+func createStorageProvider() (StorageProvider, error) {
+	storage := os.Getenv("STORAGE")
+	var provider StorageProvider
+	switch storage {
+	case "MEMORY":
+		provider = &MEMStorage{}
+	case "ETCD":
+		provider = &ETCDStorage{}
+	case "POSTGRES":
+		// TODO Setup postgres config here
+		provider = &PostgresStorage{}
+	default:
+		return nil, fmt.Errorf("Unknown storage type: %s", storage)
+	}
+
+	return provider, nil
+}
+
+func createDistLockProvider() (DistributedLockProvider, error) {
+	storage := os.Getenv("STORAGE")
+	var provider DistributedLockProvider
+	switch storage {
+	case "MEMORY":
+		provider = &MEMLockProvider{}
+	case "ETCD":
+		provider = &ETCDLockProvider{}
+	case "POSTGRES":
+		provider = &PostgresLockProvider{}
+	default:
+		return nil, fmt.Errorf("Unknown storage type: %s", storage)
+	}
+
+	return provider, nil
+
+}
+
+func TestMain(m *testing.M) {
+	var exitCode int
+
+	// Start the storage backend container if needed
+	ctr, err := startStorageBackendContainer()
+	defer func() {
+		if ctr != nil {
+			if err := testcontainers.TerminateContainer(ctr); err != nil {
+				log.Printf("failed to terminate container: %s", err)
+				os.Exit(TEST_FAIL_CODE)
+			}
 		}
+
+		os.Exit(exitCode)
+	}()
+
+	if err != nil {
+		fmt.Printf("Error starting storage backend container: %v\n", err)
+		os.Exit(TEST_FAIL_CODE)
 	}
+
+	storageProvider, err = createStorageProvider()
+	if err != nil {
+		fmt.Printf("Error creating storage provider: %v\n", err)
+		os.Exit(TEST_FAIL_CODE)
+	}
+
+	distLockProvider, err = createDistLockProvider()
+	if err != nil {
+		fmt.Printf("Error creating distributed lock provider: %v\n", err)
+		os.Exit(TEST_FAIL_CODE)
+	}
+	// Initialize the storage provider
+	err = storageProvider.Init(nil)
+	if err != nil {
+		fmt.Printf("Error initializing storage provider: %v\n", err)
+		os.Exit(TEST_FAIL_CODE)
+	}
+	// Initialize the distributed lock provider
+	err = distLockProvider.Init(logrus.New())
+	if err != nil {
+		fmt.Printf("Error initializing distributed lock provider: %v\n", err)
+		os.Exit(TEST_FAIL_CODE)
+	}
+
+	// Run the tests
+	exitCode = m.Run()
+
 }
 
 func TestInitFromStorage(t *testing.T) {
-	storageProviders := storageProviders(t)
-
-	for name, dl := range distLockProviders(t) {
-		ds := storageProviders[name]
-		// Doesn't return an error!
-		dl.InitFromStorage(ds, nil)
-	}
+	// Doesn't return an error!
+	distLockProvider.InitFromStorage(storageProvider, logrus.New())
 }
 
 func TestPing(t *testing.T) {
-	log := logrus.New()
-	for name, dl := range distLockProviders(t) {
-		dl.Init(log)
-		err := dl.Ping()
-		if err != nil {
-			t.Errorf("DistLock Ping() failed: %v for provider: %s", err, name)
-		}
-	}
+	err := distLockProvider.Ping()
+	require.NoError(t, err, "DistLock Ping() failed")
 }
 func TestDistributedLock(t *testing.T) {
-	log := logrus.New()
-	for name, dl := range distLockProviders(t) {
-		dl.Init(log)
-		lockDur := 10 * time.Second
-		err := dl.DistributedTimedLock(lockDur)
-		if err != nil {
-			t.Errorf("DistributedTimedLock() failed: %v for provider: %s", err, name)
-		}
-		time.Sleep(1 * time.Second)
-		if dl.GetDuration() != lockDur {
-			t.Errorf("Lock duration readout failed, expecting %s, got %s for provider: %s",
-				lockDur.String(), dl.GetDuration().String(), name)
-		}
-		err = dl.Unlock()
-		if err != nil {
-			t.Errorf("Error releasing timed lock (outer): %v for provider: %s", err, name)
-		}
-		if dl.GetDuration() != 0 {
-			t.Errorf("Lock duration readout failed, expecting 0s, got %s for provider: %s",
-				dl.GetDuration().String(), name)
-		}
+	lockDur := 10 * time.Second
+	err := distLockProvider.DistributedTimedLock(lockDur)
+	require.NoError(t, err, "DistributedTimedLock() failed")
+
+	time.Sleep(1 * time.Second)
+	if distLockProvider.GetDuration() != lockDur {
+		t.Errorf("Lock duration readout failed, expecting %s, got %s",
+			lockDur.String(), distLockProvider.GetDuration().String())
+	}
+	err = distLockProvider.Unlock()
+	require.NoErrorf(t, err, "Error releasing timed lock (outer): %v", err)
+
+	if distLockProvider.GetDuration() != 0 {
+		t.Errorf("Lock duration readout failed, expecting 0s, got %s",
+			distLockProvider.GetDuration().String())
 	}
 }
