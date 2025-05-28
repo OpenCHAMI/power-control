@@ -1,14 +1,16 @@
 package storage
 
 import (
+	"time"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 type PostgresLockProvider struct {
-	logger *logrus.Logger
-	db     *sqlx.DB
+	logger   *logrus.Logger
+	db       *sqlx.DB
+	Duration time.Duration
 }
 
 func (p *PostgresLockProvider) Init(Logger *logrus.Logger) error {
@@ -25,13 +27,15 @@ func (p *PostgresLockProvider) Ping() error {
 }
 
 func (p *PostgresLockProvider) DistributedTimedLock(maxLockTime time.Duration) error {
+	p.Duration = maxLockTime
 	return nil
 }
 
 func (p *PostgresLockProvider) Unlock() error {
+	p.Duration = 0
 	return nil
 }
 
 func (p *PostgresLockProvider) GetDuration() time.Duration {
-	return 0
+	return p.Duration
 }
