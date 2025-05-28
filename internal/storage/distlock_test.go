@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -106,26 +105,34 @@ func createDistLockProvider() (DistributedLockProvider, error) {
 }
 
 func TestMain(m *testing.M) {
-	var exitCode int
+	// TODO https://github.com/OpenCHAMI/power-control/issues/25
+	// The current test scaffolding expects that storage provider containers will spring fully-formed from the void,
+	// along with the environment information the provider Init() functions expect. This is partially handled through a
+	// dedicated test runner container, which configures the environment prior to invoking "go test". As the tests are
+	// already running inside a container, they can't spawn their own containers. The commented setup below is what
+	// we'd use if we could spawn our own containers; for now we just require something create them out of band.
 
+	//var exitCode int
 	// Start the storage backend container if needed
-	ctr, err := startStorageBackendContainer()
-	defer func() {
-		if ctr != nil {
-			if err := testcontainers.TerminateContainer(ctr); err != nil {
-				log.Printf("failed to terminate container: %s", err)
-				os.Exit(TEST_FAIL_CODE)
-			}
-		}
+	//
+	//ctr, err := startStorageBackendContainer()
+	//defer func() {
+	//	if ctr != nil {
+	//		if err := testcontainers.TerminateContainer(ctr); err != nil {
+	//			log.Printf("failed to terminate container: %s", err)
+	//			os.Exit(TEST_FAIL_CODE)
+	//		}
+	//	}
 
-		os.Exit(exitCode)
-	}()
+	//	os.Exit(exitCode)
+	//}()
 
-	if err != nil {
-		fmt.Printf("Error starting storage backend container: %v\n", err)
-		os.Exit(TEST_FAIL_CODE)
-	}
+	//if err != nil {
+	//	fmt.Printf("Error starting storage backend container: %v\n", err)
+	//	os.Exit(TEST_FAIL_CODE)
+	//}
 
+	var err error
 	storageProvider, err = createStorageProvider()
 	if err != nil {
 		fmt.Printf("Error creating storage provider: %v\n", err)
@@ -151,7 +158,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Run the tests
-	exitCode = m.Run()
+	m.Run()
 
 }
 
