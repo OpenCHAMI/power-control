@@ -32,6 +32,7 @@ ephCertDir=ephemeral_cert
 
 echo "COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME}"
 echo "COMPOSE_FILE: $COMPOSE_FILE"
+echo "STORAGE: ${STORAGE}"
 
 
 function cleanup() {
