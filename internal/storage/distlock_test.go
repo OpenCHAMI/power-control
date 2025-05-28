@@ -177,15 +177,6 @@ func TestDistributedLock(t *testing.T) {
 	require.NoError(t, err, "DistributedTimedLock() failed")
 
 	time.Sleep(1 * time.Second)
-	if distLockProvider.GetDuration() != lockDur {
-		t.Errorf("Lock duration readout failed, expecting %s, got %s",
-			lockDur.String(), distLockProvider.GetDuration().String())
-	}
 	err = distLockProvider.Unlock()
 	require.NoErrorf(t, err, "Error releasing timed lock (outer): %v", err)
-
-	if distLockProvider.GetDuration() != 0 {
-		t.Errorf("Lock duration readout failed, expecting 0s, got %s",
-			distLockProvider.GetDuration().String())
-	}
 }

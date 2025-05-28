@@ -1,17 +1,17 @@
 // MIT License
-// 
+//
 // (C) Copyright [2022-2023] Hewlett Packard Enterprise Development LP
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
 // to deal in the Software without restriction, including without limitation
 // the rights to use, copy, modify, merge, publish, distribute, sublicense,
 // and/or sell copies of the Software, and to permit persons to whom the
 // Software is furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included
 // in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -26,8 +26,9 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	"github.com/sirupsen/logrus"
+
 	hmetcd "github.com/Cray-HPE/hms-hmetcd"
+	"github.com/sirupsen/logrus"
 )
 
 //This file contains an in-memory implementation of a distributed locking
@@ -36,11 +37,9 @@ import (
 //ETCD locking mechanism, which contains an in-memory implementation.  This
 //implementation is just to satisfy the dist'd lock interface.
 
-
 type MEMLockProvider struct {
-	Logger *logrus.Logger
-	Duration time.Duration
-	mutex *sync.Mutex
+	Logger   *logrus.Logger
+	mutex    *sync.Mutex
 	kvHandle hmetcd.Kvi
 }
 
@@ -53,10 +52,8 @@ func fromStorageMEM(m *MEMStorage) *MEMLockProvider {
 }
 
 func toDistLockETCD(m *MEMLockProvider) *ETCDLockProvider {
-	return &ETCDLockProvider{Logger: m.Logger, Duration: m.Duration,
-	                         mutex: m.mutex, kvHandle: m.kvHandle}
+	return &ETCDLockProvider{Logger: m.Logger, mutex: m.mutex, kvHandle: m.kvHandle}
 }
-
 
 func (d *MEMLockProvider) Init(Logger *logrus.Logger) error {
 	var kverr error
@@ -84,12 +81,12 @@ func (d *MEMLockProvider) InitFromStorage(m interface{}, Logger *logrus.Logger) 
 	d.Logger = ms.Logger
 	d.mutex = ms.mutex
 	d.kvHandle = ms.kvHandle
-	if (Logger == nil) {
+	if Logger == nil {
 		d.Logger = ms.Logger
 	} else {
 		d.Logger = Logger
 	}
-	if (d.Logger == nil) {
+	if d.Logger == nil {
 		d.Logger = logrus.New()
 	}
 }
@@ -100,10 +97,9 @@ func (d *MEMLockProvider) Ping() error {
 }
 
 func (d *MEMLockProvider) DistributedTimedLock(maxLockTime time.Duration) error {
-	if (maxLockTime < time.Second) {
+	if maxLockTime < time.Second {
 		return fmt.Errorf("Error: lock duration request invalid -- must be >= 1 second.")
 	}
-	d.Duration = maxLockTime
 	e := toDistLockETCD(d)
 	return e.DistributedTimedLock(maxLockTime)
 }
@@ -111,11 +107,5 @@ func (d *MEMLockProvider) DistributedTimedLock(maxLockTime time.Duration) error 
 func (d *MEMLockProvider) Unlock() error {
 	e := toDistLockETCD(d)
 	err := e.Unlock()
-	d.Duration = 0
 	return err
 }
-
-func (d *MEMLockProvider) GetDuration() time.Duration {
-	return d.Duration
-}
-

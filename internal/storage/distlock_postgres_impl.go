@@ -35,7 +35,3 @@ func (p *PostgresLockProvider) Unlock() error {
 	p.Duration = 0
 	return nil
 }
-
-func (p *PostgresLockProvider) GetDuration() time.Duration {
-	return p.Duration
-}
