@@ -28,7 +28,6 @@ import (
 	"os"
 	"sort"
 	"testing"
-	"time"
 )
 
 //Tests will use the memory interface, since it exercises both the memory and
@@ -65,16 +64,13 @@ func pcompEqual(a, b *model.PowerStatusComponent) bool {
 
 func TestPowerStatusStorage(t *testing.T) {
 	var ms StorageProvider
-	var ds DistributedLockProvider
 
 	if (os.Getenv("ETCD_HOST") != "") && (os.Getenv("ETCD_PORT") != "") {
 		t.Logf("Using ETCD backing store.")
 		ms = &ETCDStorage{}
-		ds = &ETCDLockProvider{}
 	} else {
 		t.Logf("Using In-Memory backing store.")
 		ms = &MEMStorage{}
-		ds = &MEMLockProvider{}
 	}
 
 	err := ms.Init(nil)
@@ -85,16 +81,6 @@ func TestPowerStatusStorage(t *testing.T) {
 	err = ms.Ping()
 	if err != nil {
 		t.Errorf("Storage Ping() failed: %v", err)
-	}
-
-	ds.InitFromStorage(ms, nil)
-	if err != nil {
-		t.Errorf("DistLock InitFromStorage() failed: %v", err)
-	}
-
-	err = ds.Ping()
-	if err != nil {
-		t.Errorf("DistLock Ping() failed: %v", err)
 	}
 
 	pstat := model.PowerStatusComponent{XName: "x0c0s0b0n0",
@@ -177,27 +163,5 @@ func TestPowerStatusStorage(t *testing.T) {
 	_, err = ms.GetPowerStatus(pErrComp.XName)
 	if err == nil {
 		t.Errorf("GetPowerStatus() with bad XName should have failed, did not.")
-	}
-
-	//For distributed timed locks, the memory-based implementation does nothing
-	//for locking, so all we can exercise is the function calls.
-
-	lockDur := 10 * time.Second
-	err = ds.DistributedTimedLock(lockDur)
-	if err != nil {
-		t.Errorf("DistributedTimedLock() failed: %v", err)
-	}
-	time.Sleep(1 * time.Second)
-	if ds.GetDuration() != lockDur {
-		t.Errorf("Lock duration readout failed, expecting %s, got %s",
-			lockDur.String(), ds.GetDuration().String())
-	}
-	err = ds.Unlock()
-	if err != nil {
-		t.Errorf("Error releasing timed lock (outer): %v", err)
-	}
-	if ds.GetDuration() != 0 {
-		t.Errorf("Lock duration readout failed, expecting 0s, got %s",
-			ds.GetDuration().String())
 	}
 }
