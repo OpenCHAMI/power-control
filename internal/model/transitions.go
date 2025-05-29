@@ -91,22 +91,22 @@ func ToTransition(parameter TransitionParameter, expirationTimeMins int) (TR Tra
 
 type Transition struct {
 	// TransitionID is the transition's ID.
-	TransitionID uuid.UUID `json:"transitionID"`
+	TransitionID uuid.UUID `json:"transitionID" db:"id"`
 	// Operation indicates the operation to perform, such as off or soft restart.
-	Operation Operation `json:"operation"`
+	Operation Operation `json:"operation" db:"operation"`
 	// TaskDeadline is the time limit for completing the transition.
-	TaskDeadline int `json:"taskDeadlineMinutes"`
+	TaskDeadline int `json:"taskDeadlineMinutes" db:"deadline"`
 	// Location contains a list of xnames and associated credentials to apply the transition to.
 	Location []LocationParameter `json:"location"`
 	// CreateTime is the time the transition was requested.
-	CreateTime time.Time `json:"createTime"`
+	CreateTime time.Time `json:"createTime" db:"created"`
 	// LastActiveTime is a timestamp the power service updates regularly as long as it considers the transition active.
 	// This is used to reap old transitions that have been inactive for longer than a time threshold.
-	LastActiveTime time.Time `json:"lastActiveTime"`
+	LastActiveTime time.Time `json:"lastActiveTime" db:"active"`
 	// AutomaticExpirationTime is a timestamp that will always reap a transition, regardless of its active status.
-	AutomaticExpirationTime time.Time `json:"automaticExpirationTime"`
+	AutomaticExpirationTime time.Time `json:"automaticExpirationTime" db:"expires"`
 	// Status is the current phase of the transition lifecycle.
-	Status string `json:"transitionStatus"`
+	Status string `json:"transitionStatus" db:"status"`
 	// TaskIDs are the IDs of individual tasks in the transition/
 	TaskIDs []uuid.UUID
 
