@@ -6,6 +6,13 @@ on:
 jobs:
   run_unit_tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        storage:
+          - MEMORY
+          - ETCD
+          - POSTGRES
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -14,4 +21,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y docker-compose make
       - name: Run unit tests
-        run: make unittest
+        env:
+          STORAGE: ${{ matrix.storage }}
+        run: make unittest # this inherits STORAGE from the environment via Makefile directives

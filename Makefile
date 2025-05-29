@@ -23,6 +23,7 @@
 # Service
 NAME    ?= cray-power-control
 VERSION ?= $(shell git describe --tags --always --abbrev=0)
+STORAGE ?= POSTGRES
 
 all: image unittest integration snyk ct ct_image
 
@@ -30,7 +31,7 @@ image:
 	docker build --pull ${DOCKER_ARGS} --tag '${NAME}:${VERSION}' .
 
 unittest:
-	./runUnitTest.sh
+	STORAGE=${STORAGE} ./runUnitTest.sh
 
 integration:
 	./runIntegration.sh
