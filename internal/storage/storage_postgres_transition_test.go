@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var store PostgresStorage
-
 func TestTransitionSet(t *testing.T) {
 	var (
 		testParams     model.TransitionParameter
