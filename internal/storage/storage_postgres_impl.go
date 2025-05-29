@@ -103,8 +103,8 @@ func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
 		transition.Operation,
 		transition.TaskDeadline,
 		transition.CreateTime,
-		transition.AutomaticExpirationTime,
 		transition.LastActiveTime,
+		transition.AutomaticExpirationTime,
 		transition.Status,
 	)
 	if err != nil {
