@@ -32,7 +32,7 @@ import (
 
 var Log *logrus.Logger
 
-func Init()() {
+func Init() {
 
 	Log = logrus.New()
 	logLevel := ""

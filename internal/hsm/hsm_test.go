@@ -46,26 +46,26 @@ type Models_TS struct {
 var glogger = logrus.New()
 
 func (suite *Models_TS) TestInit() {
-	svcClient,err := hms_certs.CreateRetryableHTTPClientPair("",10,10,4)
-	suite.Assert().Equal(nil,err,"ERROR creating retryable client pair: %v",err)
+	svcClient, err := hms_certs.CreateRetryableHTTPClientPair("", 10, 10, 4)
+	suite.Assert().Equal(nil, err, "ERROR creating retryable client pair: %v", err)
 	glb := HSM_GLOBALS{SvcName: "HSMLayerTest", Logger: glogger,
-	                   LockEnabled: false, SMUrl: "http://blah/blah",
-	                   SVCHttpClient: svcClient}
+		LockEnabled: false, SMUrl: "http://blah/blah",
+		SVCHttpClient: svcClient}
 	HSM := &HSMv2{}
 	err = HSM.Init(&glb)
-	suite.Assert().Equal(err,nil,"ERROR calling Init(): %v",err)
+	suite.Assert().Equal(err, nil, "ERROR calling Init(): %v", err)
 
 	//Try error stuff
 
 	glb2 := glb
 	glb2.SMUrl = ""
 	err = HSM.Init(&glb2)
-	suite.Assert().NotEqual(err,nil,"ERROR Init(1) should have failed, did not.")
+	suite.Assert().NotEqual(err, nil, "ERROR Init(1) should have failed, did not.")
 
 	glb2 = glb
 	glb2.SVCHttpClient = nil
 	err = HSM.Init(&glb2)
-	suite.Assert().NotEqual(err,nil,"ERROR Init(2) should have failed, did not.")
+	suite.Assert().NotEqual(err, nil, "ERROR Init(2) should have failed, did not.")
 }
 
 func getSMURL() string {
@@ -75,101 +75,101 @@ func getSMURL() string {
 
 func (suite *Models_TS) TestPing() {
 	t := suite.T()
-	svcClient,err := hms_certs.CreateRetryableHTTPClientPair("",10,10,4)
-	suite.Assert().Equal(err,nil,"ERROR creating retryable client pair: %v",err)
+	svcClient, err := hms_certs.CreateRetryableHTTPClientPair("", 10, 10, 4)
+	suite.Assert().Equal(err, nil, "ERROR creating retryable client pair: %v", err)
 
 	smURL := getSMURL()
-	if (smURL == "") {
+	if smURL == "" {
 		t.Logf("INFO: No SM URL specified, nothing to do.")
 		return
 	}
 	glb := HSM_GLOBALS{SvcName: "HSMLayerTest", Logger: glogger,
-	                   LockEnabled: false, SMUrl: smURL,
-	                   SVCHttpClient: svcClient}
+		LockEnabled: false, SMUrl: smURL,
+		SVCHttpClient: svcClient}
 	HSM := &HSMv2{}
 	err = HSM.Init(&glb)
-	suite.Assert().Equal(err,nil,"ERROR calling Init(): %v",err)
+	suite.Assert().Equal(err, nil, "ERROR calling Init(): %v", err)
 
 	err = HSM.Ping()
-	suite.Assert().Equal(err,nil,"Ping() failed: %v",err)
+	suite.Assert().Equal(err, nil, "Ping() failed: %v", err)
 }
 
 //Get a list of discovered components, and return a list of components
-//of the given type(s), specified as e.g. "Node,NodeBMC,ChassisBMC".  
+//of the given type(s), specified as e.g. "Node,NodeBMC,ChassisBMC".
 //"" means keep select for all discovered components.
 
-func getDiscoveredComponents(ctype string) ([]string,error) {
+func getDiscoveredComponents(ctype string) ([]string, error) {
 	var comps []string
 	var qstr string
 
 	smURL := getSMURL()
-	if (smURL == "") {
-		return comps,fmt.Errorf("INFO: Can't get SM URL from env, nothing to do.")
+	if smURL == "" {
+		return comps, fmt.Errorf("INFO: Can't get SM URL from env, nothing to do.")
 	}
 
-	if (ctype != "") {
-		qs := strings.Split(ctype,",")
-		qs2 := "&type=" + strings.Join(qs,"&type=")
-		qstr = strings.Replace(qs2,"&","?",1)
+	if ctype != "" {
+		qs := strings.Split(ctype, ",")
+		qs2 := "&type=" + strings.Join(qs, "&type=")
+		qstr = strings.Replace(qs2, "&", "?", 1)
 	}
 
-	rsp,scode,err := doHTTP(smURL+"/hsm/v2/State/Components"+qstr,
-		http.MethodGet,nil)
-	if (err != nil) {
-		return comps,fmt.Errorf("Error in HTTP request for HSM components: %v",
+	rsp, scode, err := doHTTP(smURL+"/hsm/v2/State/Components"+qstr,
+		http.MethodGet, nil)
+	if err != nil {
+		return comps, fmt.Errorf("Error in HTTP request for HSM components: %v",
 			err)
 	}
-	if (scode != http.StatusOK) {
-		return comps,fmt.Errorf("Error getting components, bad rsp code: %d",scode)
+	if scode != http.StatusOK {
+		return comps, fmt.Errorf("Error getting components, bad rsp code: %d", scode)
 	}
 
 	var compData base.ComponentArray
-	err = json.Unmarshal(rsp,&compData)
-	if (err != nil) {
-		return comps,fmt.Errorf("Error unmarshalling component data: %v",err)
+	err = json.Unmarshal(rsp, &compData)
+	if err != nil {
+		return comps, fmt.Errorf("Error unmarshalling component data: %v", err)
 	}
 
-	for _,ep := range(compData.Components) {
-		comps = append(comps,ep.ID)
+	for _, ep := range compData.Components {
+		comps = append(comps, ep.ID)
 	}
 
-	return comps,nil
+	return comps, nil
 }
 
 //Convenience func to do HTTP requests to prevent code duplication.
 
-func doHTTP(url string, method string, pld []byte) ([]byte,int,error) {
+func doHTTP(url string, method string, pld []byte) ([]byte, int, error) {
 	var rdata []byte
 	var req *http.Request
 
-	svcClient,err := hms_certs.CreateRetryableHTTPClientPair("",10,10,4)
-	if (err != nil) {
-		return rdata,0,fmt.Errorf("ERROR creating retryable client pair: %v",err)
+	svcClient, err := hms_certs.CreateRetryableHTTPClientPair("", 10, 10, 4)
+	if err != nil {
+		return rdata, 0, fmt.Errorf("ERROR creating retryable client pair: %v", err)
 	}
 
-	if (method == http.MethodGet) {
-		req,err = http.NewRequest(method,url,nil)
+	if method == http.MethodGet {
+		req, err = http.NewRequest(method, url, nil)
 	} else {
-		req,err = http.NewRequest(method,url,bytes.NewBuffer(pld))
+		req, err = http.NewRequest(method, url, bytes.NewBuffer(pld))
 	}
-	if (err != nil) {
-		return rdata,0,fmt.Errorf("Error creating HTTP request: %v",err)
+	if err != nil {
+		return rdata, 0, fmt.Errorf("Error creating HTTP request: %v", err)
 	}
 
-	rsp,perr := svcClient.Do(req)
+	rsp, perr := svcClient.Do(req)
 	defer base.DrainAndCloseResponseBody(rsp)
-	
-	if (perr != nil) {
-		return rdata,0,fmt.Errorf("Error performing http %s: %v",method,perr)
+
+	if perr != nil {
+		return rdata, 0, fmt.Errorf("Error performing http %s: %v", method, perr)
 	}
 
-	rdata,err = io.ReadAll(rsp.Body)
+	rdata, err = io.ReadAll(rsp.Body)
 
-	if (err != nil) {
-		return rdata,0,fmt.Errorf("Error reading http rsp body: %v",err)
+	if err != nil {
+		return rdata, 0, fmt.Errorf("Error reading http rsp body: %v", err)
 	}
 
-	return rdata,rsp.StatusCode,nil
+	return rdata, rsp.StatusCode, nil
 }
 
 func (suite *Models_TS) TestReserveComponents() {
@@ -182,50 +182,50 @@ func (suite *Models_TS) TestReserveComponents() {
 	//all of them.  Call CheckDeputyKeys using the dep keys returned.  Then
 	//release the reservations.
 
-	comps,cerr := getDiscoveredComponents(xnametypes.CabinetPDUController.String()+","+
-										  xnametypes.CabinetPDUOutlet.String()+","+
-										  xnametypes.Chassis.String()+","+
-										  xnametypes.ChassisBMC.String()+","+
-										  xnametypes.NodeBMC.String()+","+
-										  xnametypes.RouterBMC.String()+","+
-										  xnametypes.Node.String())
-	if ((cerr != nil) || (len(comps) == 0)) {
+	comps, cerr := getDiscoveredComponents(xnametypes.CabinetPDUController.String() + "," +
+		xnametypes.CabinetPDUOutlet.String() + "," +
+		xnametypes.Chassis.String() + "," +
+		xnametypes.ChassisBMC.String() + "," +
+		xnametypes.NodeBMC.String() + "," +
+		xnametypes.RouterBMC.String() + "," +
+		xnametypes.Node.String())
+	if (cerr != nil) || (len(comps) == 0) {
 		t.Log("INFO: Can't get components from env, nothing to do.")
 		return
 	}
 
 	smURL := getSMURL()
-	if (smURL == "") {
+	if smURL == "" {
 		t.Logf("INFO: Can't get SM URL from env, nothing to do.")
 		return
 	}
 
-	for _,cc := range(comps) {
-		keyList = append(keyList,ReservationData{XName: cc})
+	for _, cc := range comps {
+		keyList = append(keyList, ReservationData{XName: cc})
 	}
 
-	svcClient,err := hms_certs.CreateRetryableHTTPClientPair("",10,10,4)
-	suite.Assert().Equal(err,nil,"ERROR creating retryable client pair: %v",err)
+	svcClient, err := hms_certs.CreateRetryableHTTPClientPair("", 10, 10, 4)
+	suite.Assert().Equal(err, nil, "ERROR creating retryable client pair: %v", err)
 
 	glogger.SetLevel(logrus.TraceLevel)
 	glb := HSM_GLOBALS{SvcName: "HSMLayerTest", Logger: glogger,
-	                   LockEnabled: true, SMUrl: smURL,
-	                   SVCHttpClient: svcClient}
+		LockEnabled: true, SMUrl: smURL,
+		SVCHttpClient: svcClient}
 	HSM := &HSMv2{}
 	err = HSM.Init(&glb)
-	suite.Assert().Equal(err,nil,"ERROR calling Init(): %v",err)
+	suite.Assert().Equal(err, nil, "ERROR calling Init(): %v", err)
 
-	unlockedList,rerr := HSM.ReserveComponents(keyList)
-	suite.Assert().Equal(rerr,nil,"ReserveComponents() failed: %v",rerr)
+	unlockedList, rerr := HSM.ReserveComponents(keyList)
+	suite.Assert().Equal(rerr, nil, "ReserveComponents() failed: %v", rerr)
 
-	suite.Assert().Equal(len(unlockedList),len(keyList),
+	suite.Assert().Equal(len(unlockedList), len(keyList),
 		"Unlocked list expected length: %d, got %d",
-			len(keyList), len(unlockedList))
+		len(keyList), len(unlockedList))
 
-	for ix,key := range(unlockedList) {
-		t.Logf("Now-locked Key[%d]: '%v'",ix,key)
-		tr = suite.Assert().Equal(key.Error,nil,"   ERROR: '%v'",key.Error)
-		if (tr) {
+	for ix, key := range unlockedList {
+		t.Logf("Now-locked Key[%d]: '%v'", ix, key)
+		tr = suite.Assert().Equal(key.Error, nil, "   ERROR: '%v'", key.Error)
+		if tr {
 			t.Logf("   OK.")
 		}
 	}
@@ -233,76 +233,75 @@ func (suite *Models_TS) TestReserveComponents() {
 	//Check the deputy keys for validity
 
 	err = HSM.CheckDeputyKeys(keyList)
-	suite.Assert().Equal(err,nil,"CheckDeputyKeys() failed: %v",err)
+	suite.Assert().Equal(err, nil, "CheckDeputyKeys() failed: %v", err)
 
 	//Display the dep keys results
 
-	for ix,key := range(keyList) {
-		t.Logf("Reservation[%d]: '%v'",ix,key)
-		tr = suite.Assert().Equal(key.Error,nil,"   ERROR: '%v'",key.Error)
-		if (tr) {
+	for ix, key := range keyList {
+		t.Logf("Reservation[%d]: '%v'", ix, key)
+		tr = suite.Assert().Equal(key.Error, nil, "   ERROR: '%v'", key.Error)
+		if tr {
 			t.Logf("   OK.")
 		}
 	}
 
 	//Now release the keys we own
 
-	relList,relErr := HSM.ReleaseComponents(keyList)
-	suite.Assert().Equal(relErr,nil,"ReleaseComponents() failed: %v",relErr)
+	relList, relErr := HSM.ReleaseComponents(keyList)
+	suite.Assert().Equal(relErr, nil, "ReleaseComponents() failed: %v", relErr)
 
-	suite.Assert().Equal(len(relList),0,"ReleaseComponents() didn't release all components!")
+	suite.Assert().Equal(len(relList), 0, "ReleaseComponents() didn't release all components!")
 
-	for ix,key := range(unlockedList) {
-		t.Logf("Released Key[%d]: '%v'",ix,key)
+	for ix, key := range unlockedList {
+		t.Logf("Released Key[%d]: '%v'", ix, key)
 	}
 }
-
 
 func (suite *Models_TS) TestFillHSMData() {
 	t := suite.T()
 	var tr bool
 
 	//Get discovered components.  Keep all of them
-	compList,cerr := getDiscoveredComponents("")
-	if ((cerr != nil) || (len(compList) == 0)) {
+	compList, cerr := getDiscoveredComponents("")
+	if (cerr != nil) || (len(compList) == 0) {
 		t.Log("Can't get components from env, nothing to do.")
 		return
 	}
 
 	smURL := getSMURL()
-	tr = suite.Assert().NotEqual(smURL,"","Can't get SM URL from env, nothing to do.")
-	if (!tr) {
+	tr = suite.Assert().NotEqual(smURL, "", "Can't get SM URL from env, nothing to do.")
+	if !tr {
 		return
 	}
 
-	svcClient,err := hms_certs.CreateRetryableHTTPClientPair("",10,10,4)
-	suite.Assert().Equal(err,nil,"ERROR creating retryable client pair: %v",err)
+	svcClient, err := hms_certs.CreateRetryableHTTPClientPair("", 10, 10, 4)
+	suite.Assert().Equal(err, nil, "ERROR creating retryable client pair: %v", err)
 
 	glb := HSM_GLOBALS{SvcName: "HSMLayerTest", Logger: glogger,
-	                   LockEnabled: true, SMUrl: smURL,
-	                   SVCHttpClient: svcClient, MaxComponentQuery: 1}
+		LockEnabled: true, SMUrl: smURL,
+		SVCHttpClient: svcClient, MaxComponentQuery: 1}
 	HSM := &HSMv2{}
 	err = HSM.Init(&glb)
-	suite.Assert().Equal(err,nil,"ERROR calling Init(): %v",err)
+	suite.Assert().Equal(err, nil, "ERROR calling Init(): %v", err)
 
-	compMap,err := HSM.FillHSMData(compList)
-	suite.Assert().Equal(err,nil,"ERROR FillHSMData(): %v",err)
-	suite.Assert().Equal(len(compMap),len(compList),
+	compMap, err := HSM.FillHSMData(compList)
+	suite.Assert().Equal(err, nil, "ERROR FillHSMData(): %v", err)
+	suite.Assert().Equal(len(compMap), len(compList),
 		"Length mismatch of returned map, exp: %d, got: %d",
-			len(compList),len(compMap))
+		len(compList), len(compMap))
 
-	for _,comp := range(compList) {
+	for _, comp := range compList {
 		ok := false
-		for k,_ := range(compMap) {
-			if (k == comp) {
+		for k := range compMap {
+			if k == comp {
 				ok = true
 				break
 			}
 		}
-		suite.Assert().True(ok,"ERROR: No match found for '%s'",comp)
+		suite.Assert().True(ok, "ERROR: No match found for '%s'", comp)
 	}
 }
 
 func Test_Stuff(t *testing.T) {
-	suite.Run(t,new(Models_TS))
+	suite.Run(t, new(Models_TS))
 }

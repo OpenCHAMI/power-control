@@ -44,8 +44,8 @@ import (
 
 // Helper function that does the real work of GetPowerStatus and PostPowerStatus
 func doGetPowerStatus(w http.ResponseWriter,
-                      xnamesReq []string,
-                      powerStateFilterReq, managementStateFilterReq string) {
+	xnamesReq []string,
+	powerStateFilterReq, managementStateFilterReq string) {
 	var pb model.Passback
 
 	///////////

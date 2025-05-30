@@ -1,17 +1,17 @@
 // MIT License
-// 
+//
 // (C) Copyright [2022-2023] Hewlett Packard Enterprise Development LP
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
 // to deal in the Software without restriction, including without limitation
 // the rights to use, copy, modify, merge, publish, distribute, sublicense,
 // and/or sell copies of the Software, and to permit persons to whom the
 // Software is furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included
 // in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -43,25 +43,25 @@ type HSM_GLOBALS struct {
 // There are 2 modes of operation for locking.  One is that we use a deputy
 // key passed into the PCS API.  In that case we don't have the reservation
 // key, just the deputy key.  The other is that we are not given a deputy key,
-// and we get the reservation ourselves.  In that case we get both the 
+// and we get the reservation ourselves.  In that case we get both the
 // reservation key and a deputy key.  We must release the reservation for these
 // when we're done.  In any given ReservationData object, if the ReservationKey
 // field is not empty, that tells us we got the lock ourselves.
 
 type ReservationData struct {
 	XName            string
-	ReservationOwner bool	//true == we got the rsv, not just using deputy key
-	ReservationKey   string	//only valid if we had to get the reservation
-	ExpirationTime   string	//Ditto.
-	DeputyKey        string	//Can be empty, filled in when getting reservation
+	ReservationOwner bool   //true == we got the rsv, not just using deputy key
+	ReservationKey   string //only valid if we had to get the reservation
+	ExpirationTime   string //Ditto.
+	DeputyKey        string //Can be empty, filled in when getting reservation
 	Error            error
 
 	//Private stuff, used only internally
-	needRsv      bool
+	needRsv bool
 }
 
 type HsmData struct {
-	BaseData         base.Component `json:"baseData"`
+	BaseData base.Component `json:"baseData"`
 
 	RfFQDN           string   `json:"RfFQDN"`
 	PowerActionURI   string   `json:"actionURI"`
@@ -69,14 +69,14 @@ type HsmData struct {
 	PowerStatusURI   string   `json:"statusURI"`
 	Error            error    `json:"error"`
 
-// For PCS power capping
+	// For PCS power capping
 	PowerCapURI           string              `json:"powerCapURI"`
 	PowerCapTargetURI     string              `json:"powerCapTargetURI"`
 	PowerCapControlsCount int                 `json:"powerCapControlsCount"`
 	PowerCapCtlInfoCount  int                 `json:"powerCapCtlInfoCount"`
 	PowerCaps             map[string]PowerCap `json:"powerCaps"`
 
-// For PCS transitions
+	// For PCS transitions
 	PoweredBy []string
 }
 

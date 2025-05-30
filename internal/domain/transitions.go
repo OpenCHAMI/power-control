@@ -33,10 +33,10 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base/v2"
+	"github.com/Cray-HPE/hms-xname/xnametypes"
 	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
 	"github.com/OpenCHAMI/power-control/v2/internal/model"
-	"github.com/Cray-HPE/hms-xname/xnametypes"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -391,7 +391,7 @@ func doTransition(transitionID uuid.UUID) {
 		return
 	}
 
-	for xname, _ := range pStates {
+	for xname := range pStates {
 		xnameHierarchy = append(xnameHierarchy, xname)
 	}
 
@@ -816,7 +816,7 @@ func doTransition(transitionID uuid.UUID) {
 			if err != nil {
 				logrus.Error(err)
 			}
-			for _, _ = range trsTaskList {
+			for range trsTaskList {
 				var taskErr error
 				tdone := <-rchan
 				comp := trsTaskMap[tdone.GetID()]
