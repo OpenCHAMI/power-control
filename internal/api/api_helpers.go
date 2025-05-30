@@ -57,9 +57,9 @@ func WriteHeaders(w http.ResponseWriter, pb model.Passback) {
 		w.WriteHeader(pb.StatusCode)
 		switch val := pb.Obj.(type) {
 		case []uuid.UUID:
-			WriteJSON(w, model.IDList{val})
+			WriteJSON(w, model.IDList{IDs: val})
 		case uuid.UUID:
-			WriteJSON(w, model.IDResp{val})
+			WriteJSON(w, model.IDResp{ID: val})
 		default:
 			WriteJSON(w, pb.Obj)
 		}
