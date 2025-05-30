@@ -30,10 +30,11 @@ import (
 
 	base "github.com/Cray-HPE/hms-base/v2"
 	"github.com/Cray-HPE/hms-xname/xnametypes"
+	"github.com/sirupsen/logrus"
+
 	"github.com/OpenCHAMI/power-control/v2/internal/domain"
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
 	"github.com/OpenCHAMI/power-control/v2/internal/model"
-	"github.com/sirupsen/logrus"
 )
 
 // The API layer is responsible for Json Unmarshaling and Marshaling,

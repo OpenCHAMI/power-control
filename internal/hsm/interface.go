@@ -22,9 +22,7 @@
 
 package hsm
 
-import (
-	"github.com/Cray-HPE/hms-base/v2"
-)
+import base "github.com/Cray-HPE/hms-base/v2"
 
 type HSMv2 struct {
 	HSMGlobals HSM_GLOBALS

@@ -24,11 +24,12 @@ package storage
 
 import (
 	"fmt"
-	hmetcd "github.com/Cray-HPE/hms-hmetcd"
-	"github.com/sirupsen/logrus"
 	"os"
 	"sync"
 	"time"
+
+	hmetcd "github.com/Cray-HPE/hms-hmetcd"
+	"github.com/sirupsen/logrus"
 )
 
 //This file contains an ETCD-based implementation of a distributed timed

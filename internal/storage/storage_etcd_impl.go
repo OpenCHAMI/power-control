@@ -35,9 +35,10 @@ import (
 
 	hmetcd "github.com/Cray-HPE/hms-hmetcd"
 	"github.com/Cray-HPE/hms-xname/xnametypes"
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 // This file contains interface functions for the ETCD implementation of PCS

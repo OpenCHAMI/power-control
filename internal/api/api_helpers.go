@@ -24,12 +24,14 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	logrus "github.com/sirupsen/logrus"
-	"net/http"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/logger"
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 // WriteJSON - writes JSON to the open http connection

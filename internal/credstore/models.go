@@ -25,7 +25,7 @@ package credstore
 import (
 	"time"
 
-	"github.com/Cray-HPE/hms-compcredentials"
+	compcredentials "github.com/Cray-HPE/hms-compcredentials"
 	"github.com/sirupsen/logrus"
 )
 

@@ -23,7 +23,7 @@
 package hsm
 
 import (
-	"github.com/Cray-HPE/hms-base/v2"
+	base "github.com/Cray-HPE/hms-base/v2"
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
 	reservation "github.com/OpenCHAMI/smd/v2/pkg/service-reservations"
 	"github.com/sirupsen/logrus"

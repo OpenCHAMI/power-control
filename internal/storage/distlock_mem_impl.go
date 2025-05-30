@@ -24,10 +24,11 @@ package storage
 
 import (
 	"fmt"
-	hmetcd "github.com/Cray-HPE/hms-hmetcd"
-	"github.com/sirupsen/logrus"
 	"sync"
 	"time"
+
+	hmetcd "github.com/Cray-HPE/hms-hmetcd"
+	"github.com/sirupsen/logrus"
 )
 
 //This file contains an in-memory implementation of a distributed locking
