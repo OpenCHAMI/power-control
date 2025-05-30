@@ -24,8 +24,9 @@ package model
 
 import (
 	"errors"
-	"github.com/stretchr/testify/suite"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 )
 
 type Problem7807TS struct {

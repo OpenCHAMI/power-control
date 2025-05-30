@@ -25,9 +25,10 @@ package storage
 import (
 	"time"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 type StorageProvider interface {
@@ -65,7 +66,6 @@ type StorageProvider interface {
 
 type DistributedLockProvider interface {
 	Init(Logger *logrus.Logger) error
-	InitFromStorage(si interface{}, Logger *logrus.Logger)
 	Ping() error
 	GetDuration() time.Duration
 	DistributedTimedLock(maxLockTime time.Duration) error

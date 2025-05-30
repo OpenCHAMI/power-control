@@ -24,11 +24,12 @@ package storage
 
 import (
 	"fmt"
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
 	"os"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 //Tests will use the memory interface, since it exercises both the memory and
@@ -87,9 +88,9 @@ func TestPowerStatusStorage(t *testing.T) {
 		t.Errorf("Storage Ping() failed: %v", err)
 	}
 
-	ds.InitFromStorage(ms, nil)
+	ds.Init(nil)
 	if err != nil {
-		t.Errorf("DistLock InitFromStorage() failed: %v", err)
+		t.Errorf("DistLock Init() failed: %v", err)
 	}
 
 	err = ds.Ping()

@@ -29,6 +29,7 @@ import (
 	"net/http"
 
 	base "github.com/Cray-HPE/hms-base/v2"
+
 	"github.com/OpenCHAMI/power-control/v2/internal/domain"
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
 	"github.com/OpenCHAMI/power-control/v2/internal/model"
