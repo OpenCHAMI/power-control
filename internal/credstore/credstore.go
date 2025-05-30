@@ -1,17 +1,17 @@
 // MIT License
-// 
+//
 // (C) Copyright [2022-2023] Hewlett Packard Enterprise Development LP
-// 
+//
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
 // to deal in the Software without restriction, including without limitation
 // the rights to use, copy, modify, merge, publish, distribute, sublicense,
 // and/or sell copies of the Software, and to permit persons to whom the
 // Software is furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included
 // in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -26,8 +26,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Cray-HPE/hms-compcredentials"
-	"github.com/Cray-HPE/hms-securestorage"
+	compcredentials "github.com/Cray-HPE/hms-compcredentials"
+	securestorage "github.com/Cray-HPE/hms-securestorage"
 	base "github.com/Cray-HPE/hms-xname/xnametypes"
 	"github.com/sirupsen/logrus"
 )
@@ -36,7 +36,7 @@ func (b *VAULTv0) Init(globals *CREDSTORE_GLOBALS) {
 	b.CredStoreGlobals = CREDSTORE_GLOBALS{}
 	b.CredStoreGlobals = *globals
 
-	if (b.CredStoreGlobals.Logger == nil) {
+	if b.CredStoreGlobals.Logger == nil {
 		// Set up logger with defaults.
 		b.CredStoreGlobals.Logger = logrus.New()
 	}
@@ -89,8 +89,8 @@ func (b *VAULTv0) GetCredentials(xname string) (user string, pw string, err erro
 			pw = credentials.Password
 			expire := time.Duration(b.CredStoreGlobals.CredCacheDuration) * time.Second
 			b.CredStoreGlobals.credsCacheMap[xname] = CompCredCached{
-				User: user,
-				Pw: pw,
+				User:   user,
+				Pw:     pw,
 				Expire: time.Now().Add(expire),
 			}
 		}

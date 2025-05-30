@@ -37,14 +37,15 @@ import (
 	base "github.com/Cray-HPE/hms-base/v2"
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
+	"github.com/namsral/flag"
+	"github.com/sirupsen/logrus"
+
 	"github.com/OpenCHAMI/power-control/v2/internal/api"
 	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
 	"github.com/OpenCHAMI/power-control/v2/internal/domain"
 	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
-	"github.com/namsral/flag"
-	"github.com/sirupsen/logrus"
 )
 
 // Default Port to use
@@ -222,17 +223,17 @@ func main() {
 	//These are for debugging/testing
 	envstr = os.Getenv("PCS_VAULT_CA_CHAIN_PATH")
 	if envstr != "" {
-		logger.Log.Infof("Replacing default Vault CA Chain with: '%s'",envstr)
+		logger.Log.Infof("Replacing default Vault CA Chain with: '%s'", envstr)
 		hms_certs.ConfigParams.CAChainPath = envstr
 	}
 	envstr = os.Getenv("PCS_VAULT_PKI_BASE")
 	if envstr != "" {
-		logger.Log.Infof("Replacing default Vault PKI Base with: '%s'",envstr)
+		logger.Log.Infof("Replacing default Vault PKI Base with: '%s'", envstr)
 		hms_certs.ConfigParams.VaultPKIBase = envstr
 	}
 	envstr = os.Getenv("PCS_VAULT_PKI_PATH")
 	if envstr != "" {
-		logger.Log.Infof("Replacing default Vault PKI Path with: '%s'",envstr)
+		logger.Log.Infof("Replacing default Vault PKI Path with: '%s'", envstr)
 		hms_certs.ConfigParams.PKIPath = envstr
 	}
 	envstr = os.Getenv("PCS_LOG_INSECURE_FAILOVER")

@@ -24,11 +24,12 @@ package storage
 
 import (
 	"fmt"
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
 	"os"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 //Tests will use the memory interface, since it exercises both the memory and

@@ -29,11 +29,12 @@ import (
 	"time"
 
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
+	"github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
+
 	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
 	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
-	"github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 )
 
 var GLOB *DOMAIN_GLOBALS
@@ -43,37 +44,37 @@ func Init(glob *DOMAIN_GLOBALS) {
 }
 
 type DOMAIN_GLOBALS struct {
-	CAUri             string
-	BaseTRSTask       *trs_http_api.HttpTask
-	RFTloc            *trs_http_api.TrsAPI
-	HSMTloc           *trs_http_api.TrsAPI
-	RFClientLock      *sync.RWMutex
-	Running           *bool
-	DSP               *storage.StorageProvider
-	HSM               *hsm.HSMProvider
-	RFHttpClient      *hms_certs.HTTPClientPair
-	SVCHttpClient     *hms_certs.HTTPClientPair
-	RFTransportReady  *bool
-	VaultEnabled      bool
-	CS                *credstore.CredStoreProvider
-	DistLock          *storage.DistributedLockProvider
-	MaxNumCompleted   int
-	ExpireTimeMins    int
-	PodName           string
+	CAUri            string
+	BaseTRSTask      *trs_http_api.HttpTask
+	RFTloc           *trs_http_api.TrsAPI
+	HSMTloc          *trs_http_api.TrsAPI
+	RFClientLock     *sync.RWMutex
+	Running          *bool
+	DSP              *storage.StorageProvider
+	HSM              *hsm.HSMProvider
+	RFHttpClient     *hms_certs.HTTPClientPair
+	SVCHttpClient    *hms_certs.HTTPClientPair
+	RFTransportReady *bool
+	VaultEnabled     bool
+	CS               *credstore.CredStoreProvider
+	DistLock         *storage.DistributedLockProvider
+	MaxNumCompleted  int
+	ExpireTimeMins   int
+	PodName          string
 }
 
 func (g *DOMAIN_GLOBALS) NewGlobals(base *trs_http_api.HttpTask,
-                                    tlocRF *trs_http_api.TrsAPI,
-                                    tlocSVC *trs_http_api.TrsAPI,
-                                    clientRF *hms_certs.HTTPClientPair,
-                                    clientSVC *hms_certs.HTTPClientPair,
-                                    rfClientLock *sync.RWMutex,
-                                    running *bool, dsp *storage.StorageProvider,
-                                    hsm *hsm.HSMProvider, vaultEnabled bool,
-                                    credStore *credstore.CredStoreProvider,
-                                    distLock *storage.DistributedLockProvider,
-                                    maxNumCompleted int, expireTimeMins int,
-									podName string) {
+	tlocRF *trs_http_api.TrsAPI,
+	tlocSVC *trs_http_api.TrsAPI,
+	clientRF *hms_certs.HTTPClientPair,
+	clientSVC *hms_certs.HTTPClientPair,
+	rfClientLock *sync.RWMutex,
+	running *bool, dsp *storage.StorageProvider,
+	hsm *hsm.HSMProvider, vaultEnabled bool,
+	credStore *credstore.CredStoreProvider,
+	distLock *storage.DistributedLockProvider,
+	maxNumCompleted int, expireTimeMins int,
+	podName string) {
 	g.BaseTRSTask = base
 	g.RFTloc = tlocRF
 	g.HSMTloc = tlocSVC

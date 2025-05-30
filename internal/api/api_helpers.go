@@ -24,12 +24,14 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	logrus "github.com/sirupsen/logrus"
-	"net/http"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/logger"
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 // WriteJSON - writes JSON to the open http connection
@@ -55,9 +57,9 @@ func WriteHeaders(w http.ResponseWriter, pb model.Passback) {
 		w.WriteHeader(pb.StatusCode)
 		switch val := pb.Obj.(type) {
 		case []uuid.UUID:
-			WriteJSON(w, model.IDList{val})
+			WriteJSON(w, model.IDList{IDs: val})
 		case uuid.UUID:
-			WriteJSON(w, model.IDResp{val})
+			WriteJSON(w, model.IDResp{ID: val})
 		default:
 			WriteJSON(w, pb.Obj)
 		}
