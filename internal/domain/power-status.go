@@ -440,7 +440,7 @@ func getVaultCredsAll(compMap map[string]*componentPowerInfo) error {
 // So for now, if there is no Response data and Err is nil, we will consider
 // that a 204.  If there is no Response and Err is populated, it will be a 500.
 func getStatusCode(tp *trsapi.HttpTask) int {
-	ecode := 600
+	var ecode int
 	if tp.Request.Response != nil {
 		ecode = int(tp.Request.Response.StatusCode)
 	} else {
