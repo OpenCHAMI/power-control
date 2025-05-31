@@ -149,6 +149,8 @@ func doHTTP(url string, method string, pld []byte) ([]byte, int, error) {
 	return rdata, rsp.StatusCode, nil
 }
 
+// TRT this sets up data store, SMD, TRS, and vault, because ready/live are just "can you connect to everything?", but
+// TRT as such this is kinda just a pass-through to those functions. it could use mocks instead pretty easily
 func (suite *Models_TS) TestHealthStuff() {
 	var rsp []byte
 	var scode int

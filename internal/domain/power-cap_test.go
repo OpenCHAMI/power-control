@@ -210,6 +210,11 @@ func TestDoPowerCapTask(t *testing.T) {
 // Non-UnitTest functions (Helpers, servers, etc)
 /////////////////////////
 
+// TRT this sets up _mock_ redfish endpoints and SMD. the latter is _extremely_ limited though, and can only emit two
+// TRT powercap responses. sets up local TRS and mem datastorage, which i guess requires no actual connection
+// TRT parameters despite being layered over etcd proper.
+// TRT
+// TRT AFAICT, this can operate without any external environment prep.
 // Sets up everything needed for running power capping domain functions such as
 // httptest servers, HSM/storage/trs packages, etc.
 func doSetup() error {

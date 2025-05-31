@@ -45,6 +45,7 @@ type Models_TS struct {
 
 var glogger = logrus.New()
 
+// TRT this is a unit, it tests client-side configuration validation only
 func (suite *Models_TS) TestInit() {
 	svcClient, err := hms_certs.CreateRetryableHTTPClientPair("", 10, 10, 4)
 	suite.Assert().Equal(nil, err, "ERROR creating retryable client pair: %v", err)
@@ -68,11 +69,16 @@ func (suite *Models_TS) TestInit() {
 	suite.Assert().NotEqual(err, nil, "ERROR Init(2) should have failed, did not.")
 }
 
+// TRT this relies on the environment having configured what i think is SMD, although it technically refers to the
+// TRT suite instead of SMD alone. read-only. the existing environment sets:
+// TRT Dockerfile:ENV SMS_SERVER=https://api-gateway.default.svc.cluster.local/apis/smd
 func getSMURL() string {
 	envstr := os.Getenv("SMS_SERVER")
 	return envstr
 }
 
+// TRT this is an integration test, it relies on the presence of a running SMD indicated by getSMURL(). it does not
+// TRT make use of the attached suite at all, but should be able to, by calling HSM.Init() and building glb in advance.
 func (suite *Models_TS) TestPing() {
 	t := suite.T()
 	svcClient, err := hms_certs.CreateRetryableHTTPClientPair("", 10, 10, 4)
@@ -98,6 +104,8 @@ func (suite *Models_TS) TestPing() {
 //of the given type(s), specified as e.g. "Node,NodeBMC,ChassisBMC".
 //"" means keep select for all discovered components.
 
+// TRT utility test helper. requires SMD from the heavens. performs its own pseudo-client initiation via doHTTP and
+// TRT handl-built API requests and unmarshal
 func getDiscoveredComponents(ctype string) ([]string, error) {
 	var comps []string
 	var qstr string
@@ -138,6 +146,7 @@ func getDiscoveredComponents(ctype string) ([]string, error) {
 
 //Convenience func to do HTTP requests to prevent code duplication.
 
+// TRT utility test helper, part of ad hoc SMD client
 func doHTTP(url string, method string, pld []byte) ([]byte, int, error) {
 	var rdata []byte
 	var req *http.Request
@@ -172,6 +181,7 @@ func doHTTP(url string, method string, pld []byte) ([]byte, int, error) {
 	return rdata, rsp.StatusCode, nil
 }
 
+// TRT integration test, requires SMD, reads (component list) and writes (reservations)
 func (suite *Models_TS) TestReserveComponents() {
 	t := suite.T()
 	var keyList []ReservationData
@@ -257,6 +267,7 @@ func (suite *Models_TS) TestReserveComponents() {
 	}
 }
 
+// TRT integration test, requires SMD, reads (component list) and writes (IDK what)
 func (suite *Models_TS) TestFillHSMData() {
 	t := suite.T()
 	var tr bool
@@ -302,6 +313,7 @@ func (suite *Models_TS) TestFillHSMData() {
 	}
 }
 
+// TRT Stuff! there's nothing actually in the suite other than the test list
 func Test_Stuff(t *testing.T) {
 	suite.Run(t, new(Models_TS))
 }

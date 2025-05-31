@@ -31,6 +31,7 @@ import (
 	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
+//TRT ironically, i think this ends up being a unit test as such
 //Tests will use the memory interface, since it exercises both the memory and
 //ETCD implementations.
 

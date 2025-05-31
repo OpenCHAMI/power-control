@@ -45,11 +45,23 @@ import (
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
 )
 
+// TRT despite making better use of the suite, this still doesn't place much in the suite struct, presumably because
+// TRT globals, globals everywhere
 type Transitions_TS struct {
 	suite.Suite
 	hsmURL string
 }
 
+// TRT an actual suite setup function! hurray!
+// TRT optionally sets up vault connection
+// TRT
+// TRT sets up TRS, https://github.com/Cray-HPE/hms-trs-app-api/ and five other repos for doing kafka stuff, but which
+// TRT I guess can operate local-only? We have 'Dockerfile:ENV TRS_IMPLEMENTATION="LOCAL"' in the test env, IDK if
+// TRT that's viable for production? https://github.com/OpenCHAMI/roadmap/issues/64 lists that as a longer-term goal
+// TRT and that local is maybe okay. we're probably not going to test TRS proper.
+// TRT
+// TRT Sets up SMD client, needs an actual SMD
+// TRT finishes with the "all the globals" sets. dunno how much those end up the same. t.Parallel() would be fun to try
 // Sets up everything needed for running power capping domain functions such as
 // httptest servers, HSM/storage/trs packages, etc.
 func (ts *Transitions_TS) SetupSuite() {
@@ -153,6 +165,7 @@ func (ts *Transitions_TS) SetupSuite() {
 	hwStateMap = make(map[string]*componentPowerInfo)
 }
 
+// TRT not named Stuff!
 func TestTransitionsTestSuite(t *testing.T) {
 	suite.Run(t, new(Transitions_TS))
 }
@@ -161,6 +174,7 @@ func TestTransitionsTestSuite(t *testing.T) {
 // Tests
 //////////
 
+// TRT this and the other tests in this suite all mix any unit and integration tests
 func (ts *Transitions_TS) TestDoTransition() {
 	var (
 		t              *testing.T
@@ -170,6 +184,7 @@ func (ts *Transitions_TS) TestDoTransition() {
 		results        model.TransitionResp
 	)
 	t = ts.T()
+	// TRT this should use subtests and, ideally, parameterized inputs, or should split into multiple tests per func
 	/////////
 	// Test 1 - doTransition() all xnames invalid.
 	/////////

@@ -56,6 +56,10 @@ var smURL string
 var running = true
 
 func glbInit() {
+	// TRT a sync.Once impostor! this function only gets called from the suite at least. it should just be inside the
+	// TRT suite runner
+	// TRT integration test prep. connects to vault and smd, sets up a storage provider, and sets up the wondrous blob
+	// TRT of domain globals
 	if !domGlbInit {
 		var credStoreGlob credstore.CREDSTORE_GLOBALS
 		lsvcName := "PwrControlTest"
@@ -122,6 +126,8 @@ type bAuth struct {
 	password string
 }
 
+// TRT this is a rather ironic statement given how many times we rewrite this function for different tests
+// TRT okay, it's only three, but still
 //Convenience func to do HTTP requests to prevent code duplication.
 
 func doHTTP(url string, method string, pld []byte, auth *bAuth) ([]byte, int, error) {
@@ -167,6 +173,7 @@ func doHTTP(url string, method string, pld []byte, auth *bAuth) ([]byte, int, er
 //Remove a component from HSM.  This is used to test a specific "map sync"
 //function in the power status code.
 
+// TRT build your own SMD client some more!
 func removeComponent(xname string) error {
 	smURL := os.Getenv("SMS_SERVER")
 	if smURL == "" {
@@ -186,6 +193,7 @@ func removeComponent(xname string) error {
 	return nil
 }
 
+// TRT build your own SMD client some more!
 func rediscoverNode(xname string) error {
 	smURL := os.Getenv("SMS_SERVER")
 	if smURL == "" {
@@ -216,6 +224,10 @@ func turnNodeOn(node *hsm.HsmData) error {
 	return nodePower(node, "On")
 }
 
+// TRT build your own SMD client some more! this apparently serves as a mini-PCS for the monitor--rather than use
+// TRT the actual PCS code to power nodes on and off, this writes to the associated SMD state(? maybe request, IDK)
+// TRT urls directly. this is probably because domain.doTransition is ~800 LOC and does god knows how many things in
+// TRT a loop over many transition tasks farmed out to the fleet via kafka :grimacing:
 func nodePower(node *hsm.HsmData, action string) error {
 	var auth bAuth
 
@@ -272,6 +284,9 @@ func printCompList(t *testing.T, hdr string, rcomp pcsmodel.PowerStatus) {
 	}
 }
 
+// TRT one big test to rule them all. there are probably some unit-testy things inside here, i didn't read through
+// TRT to separate them out. integration, needs SMD and vault (?) and the data store. reads for the test and writes
+// TRT to create synthetic data
 func (suite *PwrStat_TS) Test_PowerStatusMonitor() {
 	var t *testing.T
 

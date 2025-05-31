@@ -41,6 +41,8 @@ type EtcdTestSettings struct {
 
 var DEFAULT_TEST_SETTINGS *EtcdTestSettings // nil means default settings
 
+// TRT this is presumably all integration tests that only need the DB, but is only relevant to etcd's weird pagination
+// TRT hack
 func createProviders(t *testing.T, settings *EtcdTestSettings) (StorageProvider, DistributedLockProvider, bool) {
 	var ms StorageProvider
 	var ds DistributedLockProvider
