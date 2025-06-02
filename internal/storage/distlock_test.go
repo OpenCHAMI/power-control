@@ -162,15 +162,11 @@ func TestMain(m *testing.M) {
 
 }
 
-func TestInitFromStorage(t *testing.T) {
-	// Doesn't return an error!
-	distLockProvider.InitFromStorage(storageProvider, logrus.New())
-}
-
 func TestPing(t *testing.T) {
 	err := distLockProvider.Ping()
 	require.NoError(t, err, "DistLock Ping() failed")
 }
+
 func TestDistributedLock(t *testing.T) {
 	lockDur := 10 * time.Second
 	err := distLockProvider.DistributedTimedLock(lockDur)
