@@ -276,15 +276,22 @@ func (p *PostgresStorage) GetAllTasksForTransition(transitionID uuid.UUID) ([]mo
 }
 
 func (p *PostgresStorage) GetAllTransitions() ([]model.Transition, error) {
-	return nil, nil
+	transitions := []model.Transition{}
+	err := p.db.Select(&transitions, "SELECT * FROM transitions")
+	if err != nil {
+		return []model.Transition{}, err
+	}
+	return transitions, nil
 }
 
 func (p *PostgresStorage) DeleteTransition(transitionID uuid.UUID) error {
-	return nil
+	_, err := p.db.Exec("DELETE FROM transitions WHERE id = $1", transitionID)
+	return err
 }
 
 func (p *PostgresStorage) DeleteTransitionTask(transitionID uuid.UUID, taskID uuid.UUID) error {
-	return nil
+	_, err := p.db.Exec("DELETE FROM transition_tasks WHERE id = $1", taskID)
+	return err
 }
 
 func (p *PostgresStorage) TASTransition(transition model.Transition, testVal model.Transition) (bool, error) {
