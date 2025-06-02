@@ -13,15 +13,15 @@ import (
 )
 
 type PostgresConfig struct {
-	Host       string `env:"PCS_POSTGRES_HOST"`
-	User       string `env:"PCS_POSTGRES_USER"`
-	DBName     string `env:"PCS_POSTGRES_DBNAME"`
-	Password   string `env:"PCS_POSTGRES_PASSWORD"`
-	Port       uint   `env:"PCS_POSTGRES_PORT"`
-	RetryCount uint64 `env:"PCS_POSTGRES_RETRY_COUNT"`
-	RetryWait  uint64 `env:"PCS_POSTGRES_RETRY_WAIT"`
-	Insecure   bool   `env:"PCS_POSTGRES_INSECURE"`
-	Opts       string `env:"PCS_POSTGRES_OPTS"`
+	Host       string
+	User       string
+	DBName     string
+	Password   string
+	Port       uint
+	RetryCount uint64
+	RetryWait  uint64
+	Insecure   bool
+	Opts       string
 }
 
 func DefaultPostgresConfig() PostgresConfig {
