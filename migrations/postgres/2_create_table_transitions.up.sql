@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS transition_tasks (
 );
 
 CREATE TABLE IF NOT EXISTS transition_locations (
-	"id" UUID PRIMARY KEY,
+	"id" SERIAL PRIMARY KEY,
 	"transition_id" UUID NOT NULL,
 	"xname" VARCHAR(255) NOT NULL,
 	-- no idea what these actually look like in practice
@@ -61,5 +61,7 @@ CREATE TABLE IF NOT EXISTS transition_locations (
 	-- TODO: PCS may not actually allow this either. idk not testing it yet
 	--FOREIGN KEY ("transition_id") REFERENCES transitions ("id") ON DELETE CASCADE
 );
+
+CREATE INDEX idx_transition_locations ON transition_locations (transition_id);
 
 COMMIT;
