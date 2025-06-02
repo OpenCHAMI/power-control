@@ -23,6 +23,7 @@ type PostgresConfig struct {
 	RetryWait  uint64
 	Insecure   bool
 	Opts       string
+	ConnStr    string
 }
 
 func DefaultPostgresConfig() PostgresConfig {
@@ -61,16 +62,18 @@ func OpenDB(config PostgresConfig, log *logrus.Logger) (*sql.DB, error) {
 		sslmode = "disable"
 	}
 
-	connStr := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s", config.Host, config.Port, config.DBName, config.User, config.Password, sslmode)
-	if config.Opts != "" {
-		connStr += " " + config.Opts
+	if config.ConnStr == "" {
+		config.ConnStr = fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s", config.Host, config.Port, config.DBName, config.User, config.Password, sslmode)
+		if config.Opts != "" {
+			config.ConnStr += " " + config.Opts
+		}
 	}
 
 	// Connect to postgres, looping every retryWait seconds up to retryCount times.
 	for ; ix <= config.RetryCount; ix++ {
 		log.Printf("Attempting connection to Postgres at %s:%d (attempt %d)", config.Host, config.Port, ix)
 
-		db, err = sql.Open("postgres", connStr)
+		db, err = sql.Open("postgres", config.ConnStr)
 		if err != nil {
 			log.Printf("ERROR: failed to open connection to Postgres at %s:%d (attempt %d, retrying in %d seconds): %v\n", config.Host, config.Port, ix, config.RetryWait, err)
 		} else {

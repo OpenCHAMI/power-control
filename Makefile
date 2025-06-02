@@ -30,11 +30,17 @@ all: image unittest integration snyk ct ct_image
 image:
 	docker build --pull ${DOCKER_ARGS} --tag '${NAME}:${VERSION}' .
 
+# (Mostly) incorrectly-named integration tests. Some actual unit tests.
 unittest:
 	STORAGE=${STORAGE} ./runUnitTest.sh
 
+# Integration tests that require docker-compose to set up the environment before invoking "go test".
 integration:
 	./runIntegration.sh
+
+# Integration tests that spawn their own containers from Go.
+integration-standalone:
+	PCS_TEST_STORAGE=${STORAGE} go test --tags=integration_tests ./...
 
 snyk:
 	./runSnyk.sh

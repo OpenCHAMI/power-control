@@ -1,3 +1,5 @@
+//go:build !integration_tests
+
 // MIT License
 //
 // (C) Copyright [2022-2023] Hewlett Packard Enterprise Development LP

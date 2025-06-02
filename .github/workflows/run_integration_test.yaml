@@ -15,3 +15,23 @@ jobs:
           sudo apt-get install -y docker-compose make
       - name: Run integration tests
         run: make integration
+  # This job runs tests with the integration_tests tag. This currently only tests the storage package.
+  run_integration_new:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        storage:
+          - MEMORY
+          - ETCD
+          - POSTGRES
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '>=1.24.0'
+      - name: Run integration tests
+        env:
+          PCS_TEST_STORAGE: ${{ matrix.storage }}
+        run: make integration-standalone
