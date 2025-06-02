@@ -904,3 +904,10 @@ func (e *ETCDStorage) TASTransition(transition model.Transition, testVal model.T
 	}
 	return ok, combinedErr
 }
+
+func (e *ETCDStorage) Close() error {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	return e.kvHandle.Close()
+}

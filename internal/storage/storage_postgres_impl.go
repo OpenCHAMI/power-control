@@ -222,3 +222,10 @@ func (p *PostgresStorage) DeleteTransitionTask(transitionID uuid.UUID, taskID uu
 func (p *PostgresStorage) TASTransition(transition model.Transition, testVal model.Transition) (bool, error) {
 	return false, nil
 }
+
+func (p *PostgresStorage) Close() error {
+	if p.db != nil {
+		return p.db.Close()
+	}
+	return nil
+}

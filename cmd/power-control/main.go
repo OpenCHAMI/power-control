@@ -293,12 +293,14 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig) 
 		logger.Log.Errorf("Error initializing storage provider: %v", err)
 		os.Exit(1)
 	}
+	defer DSP.Close()
 
 	err = DLOCK.Init(logger.Log)
 	if err != nil {
 		logger.Log.Errorf("Error initializing distributed lock provider: %v", err)
 		os.Exit(1)
 	}
+	defer DLOCK.Close()
 
 	//TODO: there should be a Ping() to insure dist lock mechanism is alive
 
