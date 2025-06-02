@@ -267,7 +267,12 @@ func (p *PostgresStorage) GetTransitionTask(_ uuid.UUID, taskID uuid.UUID) (mode
 }
 
 func (p *PostgresStorage) GetAllTasksForTransition(transitionID uuid.UUID) ([]model.TransitionTask, error) {
-	return nil, nil
+	tasks := []model.TransitionTask{}
+	err := p.db.Select(&tasks, "SELECT * FROM transition_tasks WHERE transition_id = $1", transitionID)
+	if err != nil {
+		return []model.TransitionTask{}, err
+	}
+	return tasks, nil
 }
 
 func (p *PostgresStorage) GetAllTransitions() ([]model.Transition, error) {

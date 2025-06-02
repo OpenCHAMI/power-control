@@ -4,11 +4,12 @@ package storage
 
 import (
 	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"github.com/google/uuid"
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func (s *StorageTestSuite) TestTransitionSet() {
+func (s *StorageTestSuite) TestTransitionSetGet() {
 	t := s.T()
 	var (
 		testParams     model.TransitionParameter
@@ -26,6 +27,8 @@ func (s *StorageTestSuite) TestTransitionSet() {
 		},
 	}
 
+	record := map[uuid.UUID]string{}
+
 	t.Logf("inserting some transitions and tasks")
 	testTransition, _ = model.ToTransition(testParams, 5)
 	testTransition.Status = model.TransitionStatusInProgress
@@ -36,6 +39,7 @@ func (s *StorageTestSuite) TestTransitionSet() {
 	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
 	err = s.sp.StoreTransitionTask(task)
 	s.Require().NoError(err)
+	record[task.TaskID] = task.Xname
 
 	task = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task.Xname = "x0c0s2b0n0"
@@ -44,6 +48,7 @@ func (s *StorageTestSuite) TestTransitionSet() {
 	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
 	err = s.sp.StoreTransitionTask(task)
 	s.Require().NoError(err)
+	record[task.TaskID] = task.Xname
 
 	task = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task.Xname = "x0c0s1"
@@ -52,6 +57,7 @@ func (s *StorageTestSuite) TestTransitionSet() {
 	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
 	err = s.sp.StoreTransitionTask(task)
 	s.Require().NoError(err)
+	record[task.TaskID] = task.Xname
 
 	task = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task.Xname = "x0c0s2"
@@ -60,6 +66,7 @@ func (s *StorageTestSuite) TestTransitionSet() {
 	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
 	err = s.sp.StoreTransitionTask(task)
 	s.Require().NoError(err)
+	record[task.TaskID] = task.Xname
 
 	// This preserves the original "store tasks, then store transition that owns those tasks" order of the snippet of
 	// domain.TestDoTransition() used to source this test. This _does not_ allow enforcing foreign key constraints
@@ -69,7 +76,8 @@ func (s *StorageTestSuite) TestTransitionSet() {
 	err = s.sp.StoreTransition(testTransition)
 	s.Require().NoError(err)
 
-	// discards the first page
+	// discards the first page. there isn't really anything we can do with this in tests, it's a leaky abstraction
+	// for etcd.
 	gotTransition, _, err := s.sp.GetTransition(testTransition.TransitionID)
 	s.Require().NoError(err)
 	s.Require().Equal(testTransition.TransitionID, gotTransition.TransitionID)
@@ -79,4 +87,9 @@ func (s *StorageTestSuite) TestTransitionSet() {
 	gotTask, err := s.sp.GetTransitionTask(task.TransitionID, task.TaskID)
 	s.Require().NoError(err)
 	s.Require().Equal(task, gotTask)
+
+	gotTasks, err := s.sp.GetAllTasksForTransition(testTransition.TransitionID)
+	for _, t := range gotTasks {
+		s.Assert().Equal(record[t.TaskID], t.Xname)
+	}
 }
