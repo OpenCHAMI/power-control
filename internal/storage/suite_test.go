@@ -4,10 +4,16 @@ package storage
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	migratepg "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
@@ -45,12 +51,12 @@ func (s *StorageTestSuite) SetupSuite() {
 	// TODO these still rely on the container parameters matching the expectations of Init() by prayer (manually
 	// ensuring that the testcontainer parameters create a container matching expectations, rather than the suite
 	// passing configuration
-	s.sp, err = createStorageProvider(s.T())
+	s.sp, err = createStorageProvider(s.T(), ctr)
 	if err != nil {
 		s.T().Fatalf("Error creating storage provider: %v", err)
 	}
 
-	s.dlp, err = createDistLockProvider(s.T())
+	s.dlp, err = createDistLockProvider(s.T(), ctr)
 	if err != nil {
 		s.T().Fatalf("Error creating distributed lock provider: %v\n", err)
 	}
@@ -98,6 +104,28 @@ func startPostgresContainer() (testcontainers.Container, string, error) {
 				WithStartupTimeout(5*time.Second)),
 	)
 
+	connString, err := ctr.ConnectionString(context.Background(), "sslmode=disable")
+	if err != nil {
+		return ctr, PG_CONTAINER, fmt.Errorf("failed to open db: %s", err)
+	}
+	db, err := sql.Open("postgres", connString)
+	if err != nil {
+		return ctr, PG_CONTAINER, fmt.Errorf("failed to open db: %s", err)
+	}
+	defer db.Close()
+	driver, err := migratepg.WithInstance(db, &postgres.Config{})
+	// TODO figure out how to use relative paths and swap out locations for test/prod
+	mig, err := migrate.NewWithDatabaseInstance(
+		"file:///home/rainest/src/github.com/ochami/power-control/migrations/postgres/",
+		"postgres", driver)
+	if err != nil {
+		return ctr, PG_CONTAINER, fmt.Errorf("could not migrate: %s", err)
+	}
+	err = mig.Up() // or m.Steps(2) if you want to explicitly set the number of migrations to run
+	if err != nil {
+		return ctr, PG_CONTAINER, fmt.Errorf("could not migrate: %s", err)
+	}
+
 	return ctr, PG_CONTAINER, err
 }
 
@@ -128,7 +156,7 @@ func startStorageBackendContainer(t *testing.T) (testcontainers.Container, strin
 	}
 }
 
-func createStorageProvider(t *testing.T) (StorageProvider, error) {
+func createStorageProvider(t *testing.T, ctr testcontainers.Container) (StorageProvider, error) {
 	storage := os.Getenv(STORAGE_ENV)
 	var provider StorageProvider
 	switch storage {
@@ -137,17 +165,28 @@ func createStorageProvider(t *testing.T) (StorageProvider, error) {
 	case "ETCD":
 		provider = &ETCDStorage{}
 	case "POSTGRES":
-		// TODO Setup postgres config here
-		provider = &PostgresStorage{}
+		config, err := configurePostgres(ctr)
+		if err != nil {
+			return nil, err
+		}
+		provider = &PostgresStorage{
+			Config: config,
+		}
 	default:
 		t.Logf("Unknown storage type: '%s', defaulting to POSTGRES", storage)
-		provider = &PostgresStorage{}
+		config, err := configurePostgres(ctr)
+		if err != nil {
+			return nil, err
+		}
+		provider = &PostgresStorage{
+			Config: config,
+		}
 	}
 
 	return provider, nil
 }
 
-func createDistLockProvider(t *testing.T) (DistributedLockProvider, error) {
+func createDistLockProvider(t *testing.T, ctr testcontainers.Container) (DistributedLockProvider, error) {
 	storage := os.Getenv(STORAGE_ENV)
 	var provider DistributedLockProvider
 	switch storage {
@@ -156,12 +195,38 @@ func createDistLockProvider(t *testing.T) (DistributedLockProvider, error) {
 	case "ETCD":
 		provider = &ETCDLockProvider{}
 	case "POSTGRES":
-		provider = &PostgresLockProvider{}
+		config, err := configurePostgres(ctr)
+		if err != nil {
+			return nil, err
+		}
+		provider = &PostgresLockProvider{
+			Config: config,
+		}
 	default:
 		t.Logf("Unknown storage type: '%s', defaulting to POSTGRES", storage)
-		provider = &PostgresLockProvider{}
+		config, err := configurePostgres(ctr)
+		if err != nil {
+			return nil, err
+		}
+		provider = &PostgresLockProvider{
+			Config: config,
+		}
 	}
 
 	return provider, nil
 
+}
+
+func configurePostgres(ctr testcontainers.Container) (PostgresConfig, error) {
+	pg, ok := ctr.(*testpostgres.PostgresContainer)
+	if !ok {
+		return PostgresConfig{}, fmt.Errorf("Postgres init got non-Postgres container")
+	}
+	config := DefaultPostgresConfig()
+	var err error
+	config.ConnStr, err = pg.ConnectionString(context.Background(), "sslmode=disable")
+	if err != nil {
+		return PostgresConfig{}, err
+	}
+	return config, nil
 }

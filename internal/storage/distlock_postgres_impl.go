@@ -11,6 +11,7 @@ type PostgresLockProvider struct {
 	logger   *logrus.Logger
 	db       *sqlx.DB
 	Duration time.Duration
+	Config   PostgresConfig
 }
 
 func (p *PostgresLockProvider) Init(Logger *logrus.Logger) error {
