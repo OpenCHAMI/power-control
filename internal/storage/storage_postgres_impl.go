@@ -211,6 +211,18 @@ func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
 	if err != nil {
 		return fmt.Errorf("Failed to store transition '%s': %w", transition.TransitionID, err)
 	}
+	for _, l := range transition.Location {
+		exec = `INSERT INTO transition_locations (transition_id, xname, deputy_key) VALUES ($1, $2, $3)`
+		_, err := p.db.Exec(
+			exec,
+			transition.TransitionID,
+			l.Xname,
+			l.DeputyKey,
+		)
+		if err != nil {
+			return fmt.Errorf("Failed to store transition '%s': %w", transition.TransitionID, err)
+		}
+	}
 	return nil
 }
 
@@ -251,6 +263,12 @@ func (p *PostgresStorage) GetTransition(transitionID uuid.UUID) (transition mode
 	if err != nil {
 		return model.Transition{}, model.Transition{}, err
 	}
+	locations := []model.LocationParameter{}
+	err = p.db.Select(&locations, "SELECT xname,deputy_key FROM transition_locations WHERE transition_id = $1", transitionID)
+	if err != nil {
+		return model.Transition{}, model.Transition{}, err
+	}
+	transition.Location = locations
 	return transition, transition, nil
 }
 
@@ -280,6 +298,14 @@ func (p *PostgresStorage) GetAllTransitions() ([]model.Transition, error) {
 	err := p.db.Select(&transitions, "SELECT * FROM transitions")
 	if err != nil {
 		return []model.Transition{}, err
+	}
+	for _, t := range transitions {
+		locations := []model.LocationParameter{}
+		err = p.db.Select(&locations, "SELECT xname,deputy_key FROM transition_locations WHERE transition_id = $1", t.TransitionID)
+		if err != nil {
+			return []model.Transition{}, err
+		}
+		t.Location = locations
 	}
 	return transitions, nil
 }

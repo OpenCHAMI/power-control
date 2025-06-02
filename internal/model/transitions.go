@@ -64,8 +64,8 @@ type TransitionParameter struct {
 }
 
 type LocationParameter struct {
-	Xname     string `json:"xname"`
-	DeputyKey string `json:"deputyKey,omitempty"`
+	Xname     string `json:"xname" db:"xname"`
+	DeputyKey string `json:"deputyKey,omitempty" db:"deputy_key"`
 }
 
 func ToTransition(parameter TransitionParameter, expirationTimeMins int) (TR Transition, err error) {
