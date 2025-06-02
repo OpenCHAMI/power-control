@@ -147,6 +147,7 @@ func TestPing(t *testing.T) {
 	err := distLockProvider.Ping()
 	require.NoError(t, err, "DistLock Ping() failed")
 }
+
 func TestDistributedLock(t *testing.T) {
 	timeout := 10 * time.Second
 	err := distLockProvider.DistributedTimedLock(timeout)
