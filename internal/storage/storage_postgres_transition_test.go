@@ -60,6 +60,23 @@ func (s *StorageTestSuite) TestTransitionSet() {
 	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
 	err = s.sp.StoreTransitionTask(task)
 	s.Require().NoError(err)
+
+	// This preserves the original "store tasks, then store transition that owns those tasks" order of the snippet of
+	// domain.TestDoTransition() used to source this test. This _does not_ allow enforcing foreign key constraints
+	// on the task table schema. It's unclear if this is just weirdness in the test, or if actual operation needs
+	// that same flexibility. We'll probably want to try with a proper foreign key in the future, to see if PCS crashes
+	// and burns.
 	err = s.sp.StoreTransition(testTransition)
 	s.Require().NoError(err)
+
+	// discards the first page
+	gotTransition, _, err := s.sp.GetTransition(testTransition.TransitionID)
+	s.Require().NoError(err)
+	s.Require().Equal(testTransition.TransitionID, gotTransition.TransitionID)
+	s.Require().Equal(testTransition.Operation, gotTransition.Operation)
+	s.Require().Equal(testTransition.TaskDeadline, gotTransition.TaskDeadline)
+
+	gotTask, err := s.sp.GetTransitionTask(task.TransitionID, task.TaskID)
+	s.Require().NoError(err)
+	s.Require().Equal(task, gotTask)
 }
