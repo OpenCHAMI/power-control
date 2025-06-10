@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -321,7 +323,47 @@ func (p *PostgresStorage) DeleteTransitionTask(transitionID uuid.UUID, taskID uu
 }
 
 func (p *PostgresStorage) TASTransition(transition model.Transition, testVal model.Transition) (bool, error) {
-	return false, nil
+	tx, err := p.db.Beginx()
+	if err != nil {
+		return false, fmt.Errorf("could not begin TAS transaction: %w", err)
+	}
+	defer tx.Rollback()
+	var current model.Transition
+	err = tx.Get(&current, "SELECT * FROM transitions WHERE id = $1", transition.TransitionID)
+	if err != nil {
+		return false, fmt.Errorf("could retrieve TAS transition: %w", err)
+	}
+	// []Location is not comparable. I'm unsure if we'd want to do a set equality check on it (AFAIK it is a set in
+	// practice), since they're not part of the transition per se, just stored with it in the etcd data model.
+	// Insofar as the etcd implementation _does not_ check all pages, I believe it de facto ignores Locations.
+	if cmp.Equal(testVal, current, cmpopts.IgnoreFields(model.Transition{}, "Location")) {
+		_, err := tx.Exec("DELETE FROM transitions WHERE id = $1", transition.TransitionID)
+		if err != nil {
+			return false, fmt.Errorf("could replace TAS transition: %w", err)
+		}
+		exec := `INSERT INTO transitions (id, operation, deadline, created, active, expires, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`
+		_, err = tx.Exec(
+			exec,
+			transition.TransitionID,
+			transition.Operation,
+			transition.TaskDeadline,
+			transition.CreateTime,
+			transition.LastActiveTime,
+			transition.AutomaticExpirationTime,
+			transition.Status,
+		)
+		if err != nil {
+			return false, fmt.Errorf("could replace TAS transition: %w", err)
+		}
+		if err = tx.Commit(); err != nil {
+			return false, fmt.Errorf("could not commit TAS transition: %w", err)
+		}
+	} else {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (p *PostgresStorage) Close() error {

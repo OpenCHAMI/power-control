@@ -201,3 +201,61 @@ func (s *StorageTestSuite) TestTransitionDelete() {
 		s.Assert().NotEqual(t.TransitionID, testTransition.TransitionID)
 	}
 }
+
+// TestTransitionTAS tests test and set operations on transitions.
+func (s *StorageTestSuite) TestTransitionTAS() {
+	t := s.T()
+	var (
+		testParams     model.TransitionParameter
+		testTransition model.Transition
+		err            error
+	)
+
+	testParams = model.TransitionParameter{
+		Operation: "Init",
+		Location: []model.LocationParameter{
+			model.LocationParameter{Xname: "x0c0s1b0n0"},
+			model.LocationParameter{Xname: "x0c0s2b0n0"},
+			model.LocationParameter{Xname: "x0c0s1"},
+			model.LocationParameter{Xname: "x0c0s2"},
+		},
+	}
+
+	t.Logf("inserting some transitions and tasks")
+	testTransition, _ = model.ToTransition(testParams, 5)
+	testTransition.Status = model.TransitionStatusInProgress
+	err = s.sp.StoreTransition(testTransition)
+	s.Require().NoError(err)
+
+	// discards the first page. there isn't really anything we can do with this in tests, it's a leaky abstraction
+	// for etcd.
+	t.Logf("retrieving transition %s", testTransition.TransitionID)
+	gotTransition, _, err := s.sp.GetTransition(testTransition.TransitionID)
+	s.Require().NoError(err)
+
+	modTransition := gotTransition
+	modTransition.Status = model.TransitionStatusAborted
+
+	// nothing should have touched the original, this change should succeed
+	t.Logf("updating transition %s", testTransition.TransitionID)
+	changed, err := s.sp.TASTransition(modTransition, gotTransition)
+	s.Require().NoError(err)
+	s.Require().True(changed)
+
+	// the change succeeded, testing against the original should now fail
+	modTransition.Status = model.TransitionStatusNew
+	changed, err = s.sp.TASTransition(modTransition, gotTransition)
+	s.Require().NoError(err)
+	s.Require().False(changed)
+
+	// the transition in the db should reflect the first change
+	gotTransition, _, err = s.sp.GetTransition(testTransition.TransitionID)
+	s.Require().NoError(err)
+	s.Require().Equal(gotTransition.Status, model.TransitionStatusAborted)
+
+	modTransition.TransitionID = uuid.New()
+	t.Logf("failing to update non-existent transition %s", modTransition.TransitionID)
+	changed, err = s.sp.TASTransition(modTransition, gotTransition)
+	s.Require().ErrorContains(err, "could retrieve TAS transition")
+	s.Require().False(changed)
+}
