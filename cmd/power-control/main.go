@@ -837,8 +837,10 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 
 // flagToEnvVarName converts a flag name to an environment variable name
 func flagToEnvVarName(flag string) string {
-	envVarName := "PCS_" + flag
-	envVarName = strings.ToUpper(strings.ReplaceAll(envVarName, "-", "_"))
+	// TODO: It might be nice to have a standard prefix, but for now
+	// this would have a bit a ripple effect on existing code.
+	// envVarName := "PCS_" + flag
+	envVarName := strings.ToUpper(strings.ReplaceAll(flag, "-", "_"))
 
 	return envVarName
 }
