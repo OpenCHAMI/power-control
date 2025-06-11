@@ -78,21 +78,6 @@ func (d *MEMLockProvider) Init(Logger *logrus.Logger) error {
 	return nil
 }
 
-func (d *MEMLockProvider) InitFromStorage(m interface{}, Logger *logrus.Logger) {
-	ms := m.(*MEMStorage)
-	d.Logger = ms.Logger
-	d.mutex = ms.mutex
-	d.kvHandle = ms.kvHandle
-	if Logger == nil {
-		d.Logger = ms.Logger
-	} else {
-		d.Logger = Logger
-	}
-	if d.Logger == nil {
-		d.Logger = logrus.New()
-	}
-}
-
 func (d *MEMLockProvider) Ping() error {
 	e := toStorageMEM(d)
 	return e.Ping()

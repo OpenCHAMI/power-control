@@ -66,7 +66,6 @@ type StorageProvider interface {
 
 type DistributedLockProvider interface {
 	Init(Logger *logrus.Logger) error
-	InitFromStorage(si interface{}, Logger *logrus.Logger)
 	Ping() error
 	GetDuration() time.Duration
 	DistributedTimedLock(maxLockTime time.Duration) error
