@@ -3,10 +3,11 @@ package storage
 import (
 	"time"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 type PostgresStorage struct {
