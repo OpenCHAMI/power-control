@@ -39,12 +39,12 @@ import (
 	base "github.com/Cray-HPE/hms-base/v2"
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
-	"github.com/sirupsen/logrus"
 	"github.com/golang-migrate/migrate/v4"
 	db "github.com/golang-migrate/migrate/v4/database"
 	pg "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -651,12 +651,9 @@ func migrateSchema(schema *schemaConfig, postgres *storage.PostgresConfig, err e
 
 	// Check if "dirty" (version is > 0), force current version to clear dirty flag
 	// if dirty flag is set.
-	var (
-		version   uint
-		noVersion = false
-		dirty     = false
-	)
-	version, dirty, err = m.Version()
+	var noVersion = false
+
+	version, dirty, err := m.Version()
 	if err == migrate.ErrNilVersion {
 		lg.Printf("No migrations have been applied yet (version=%d)", version)
 		noVersion = true
@@ -707,8 +704,6 @@ func migrateSchema(schema *schemaConfig, postgres *storage.PostgresConfig, err e
 	} else {
 		lg.Printf("Migration: Already at target version (%d), nothing to do", version)
 	}
-	version = 0
-	dirty = false
 	lg.Printf("Checking resulting migration version")
 	version, dirty, err = m.Version()
 	if err == migrate.ErrNilVersion {
