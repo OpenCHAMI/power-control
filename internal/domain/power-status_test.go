@@ -110,8 +110,8 @@ func glbInit() {
 		DLOCK = tdLock
 		DLOCK.Init(tlogger)
 
-		domGlb.NewGlobals(nil, &TLOC_rf, nil, nil, svcClient, &sync.RWMutex{},
-			&running, &DSP, &HSM, vaultEnabled, &CS, &DLOCK, 20000, 1440,
+		domGlb.NewGlobals(nil, TLOC_rf, nil, nil, svcClient, &sync.RWMutex{},
+			&running, DSP, HSM, vaultEnabled, CS, DLOCK, 20000, 1440,
 			"power-status_test-pod")
 
 		tlogger.Errorf("DLOCK: '%v', Globals: '%v'", DLOCK, domGlb)
@@ -227,7 +227,7 @@ func nodePower(node *hsm.HsmData, action string) error {
 		return fmt.Errorf("Vault not enabled, can't get creds for BMC.")
 	}
 
-	un, pw, cerr := (*domGlb.CS).GetControllerCredentials(node.BaseData.ID)
+	un, pw, cerr := domGlb.CS.GetControllerCredentials(node.BaseData.ID)
 	if cerr != nil {
 		return fmt.Errorf("Can't get creds for %s: %v", node.BaseData.ID, cerr)
 	}
@@ -289,7 +289,7 @@ func (suite *PwrStat_TS) Test_PowerStatusMonitor() {
 
 	//Get a list of components from HSM
 
-	compMap, cerr := (*domGlb.HSM).FillHSMData([]string{"all"})
+	compMap, cerr := domGlb.HSM.FillHSMData([]string{"all"})
 	suite.Assert().Equal(nil, cerr, "FillHSMData() failed: %v", cerr)
 
 	var comps []string
