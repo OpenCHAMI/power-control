@@ -78,11 +78,11 @@ const (
 
 var hwStateMap = make(map[string]*componentPowerInfo)
 var glogger *logrus.Logger
-var hsmHandle *pcshsm.HSMProvider
-var kvStore *storage.StorageProvider
-var ccStore *credstore.CredStoreProvider
-var distLocker *storage.DistributedLockProvider
-var tloc *trsapi.TrsAPI
+var hsmHandle pcshsm.HSMProvider
+var kvStore storage.StorageProvider
+var ccStore credstore.CredStoreProvider
+var distLocker storage.DistributedLockProvider
+var tloc trsapi.TrsAPI
 var pmSampleInterval time.Duration
 var distLockMaxTime time.Duration
 var pstateMonitorRunning bool
@@ -195,7 +195,7 @@ func GetPowerStatus(xnames []string,
 	// TODO: We should consider the performance and scaling impact of
 	// retrieving status for every single component in the system if the
 	// caller only wants the status of a few components.
-	statusObj, err := (*kvStore).GetAllPowerStatus()
+	statusObj, err := kvStore.GetAllPowerStatus()
 	if err != nil {
 		//TODO: we don't have an HTTP status code from a failed
 		//GetAllPowerStatus() call; might need to pass that back in a
@@ -310,7 +310,7 @@ func updateComponentMap() error {
 
 	//Get all components in HSM
 
-	compMap, err := (*hsmHandle).FillHSMData([]string{"all"})
+	compMap, err := hsmHandle.FillHSMData([]string{"all"})
 	if err != nil {
 		return fmt.Errorf("Error fetching HSM data: %v", err)
 	}
@@ -330,7 +330,7 @@ func updateComponentMap() error {
 		if !ok {
 			glogger.Infof("Removing '%s' from local map (no longer in HSM component list).", k)
 			delete(hwStateMap, k)
-			(*kvStore).DeletePowerStatus(k)
+			kvStore.DeletePowerStatus(k)
 		}
 	}
 
@@ -416,7 +416,7 @@ func getVaultCredsAll(compMap map[string]*componentPowerInfo) error {
 	//The credstore layer caches creds, so this should be fast.
 
 	for k, v := range compMap {
-		un, pw, err = (*ccStore).GetControllerCredentials(k)
+		un, pw, err = (ccStore).GetControllerCredentials(k)
 		if err != nil {
 			return fmt.Errorf("ERROR: Can't get BMC creds for '%s': %v", k, err)
 		}
@@ -504,7 +504,7 @@ func getHWStatesFromHW() error {
 	//Use TRS to get all HW states.  Create a map so the TRS task completion
 	//notifications can map back to an XName.
 
-	taskList := (*tloc).CreateTaskList(&sourceTL, len(hwStateMap))
+	taskList := tloc.CreateTaskList(&sourceTL, len(hwStateMap))
 	activeTasks := 0
 	taskIX := 0
 
@@ -564,7 +564,7 @@ func getHWStatesFromHW() error {
 
 	if activeTasks == 0 {
 		glogger.Warnf("%s: No TRS tasks to launch", fname)
-		(*tloc).Close(&taskList)
+		tloc.Close(&taskList)
 		return nil
 	}
 
@@ -574,7 +574,7 @@ func getHWStatesFromHW() error {
 		"(timeout %v) (%s)",
 		fname, activeTasks, taskIX, statusTimeout, GLOB.PodName)
 
-	rchan, err := (*tloc).Launch(&taskList)
+	rchan, err := tloc.Launch(&taskList)
 	if err != nil {
 		return fmt.Errorf("%s: TRS Launch() error: %v.", fname, err)
 	}
@@ -648,7 +648,7 @@ func getHWStatesFromHW() error {
 			break
 		}
 	}
-	(*tloc).Close(&taskList)
+	tloc.Close(&taskList)
 	close(rchan)
 
 	glogger.Infof("%s: Processing BMC status responses (%s)", fname, GLOB.PodName)
@@ -931,7 +931,7 @@ func updateHWState(xname string, hwState pcsmodel.PowerStateFilter,
 	psc.SupportedPowerTransitions = comp.PSComp.SupportedPowerTransitions
 	psc.LastUpdated = comp.PSComp.LastUpdated
 
-	err := (*kvStore).StorePowerStatus(psc)
+	err := kvStore.StorePowerStatus(psc)
 	if err != nil {
 		glogger.Errorf("%s: ERROR storing component state for '%s': %v",
 			funcname, xname, err)
@@ -1004,27 +1004,27 @@ func toPCSPowerActions(rfPowerActions []string) []string {
 // If it has been awhile since the last update, attempt to
 // become the new master.
 func getPowerStatusMaster() bool {
-	lockErr := (*distLocker).DistributedTimedLock(distLockMaxTime)
+	lockErr := (distLocker).DistributedTimedLock(distLockMaxTime)
 	if lockErr != nil {
 		// Someone else is already doing this check which means we aren't going to be master.
 		return false
 	}
 	defer func() {
-		unlockErr := (*distLocker).Unlock()
+		unlockErr := (distLocker).Unlock()
 		if unlockErr != nil {
 			glogger.Errorf("ERROR releasing distributed lock: %v", unlockErr)
 		}
 	}()
 
 	now := time.Now()
-	lastUpdated, err := (*kvStore).GetPowerStatusMaster()
+	lastUpdated, err := kvStore.GetPowerStatusMaster()
 	if err != nil {
 		if !strings.Contains(err.Error(), "does not exist") {
 			glogger.Errorf("ERROR getting power status master: %v", err)
 			return false
 		}
 		// First master. Just set the value to take master.
-		err = (*kvStore).StorePowerStatusMaster(now)
+		err = kvStore.StorePowerStatusMaster(now)
 		if err != nil {
 			glogger.Errorf("ERROR while trying to become the power status master: %v", err)
 			return false
@@ -1035,7 +1035,7 @@ func getPowerStatusMaster() bool {
 			// Someone else is master
 			return false
 		}
-		success, err := (*kvStore).TASPowerStatusMaster(now, lastUpdated)
+		success, err := kvStore.TASPowerStatusMaster(now, lastUpdated)
 		if err != nil {
 			// ETCD error we're not getting master this time
 			glogger.Errorf("ERROR while trying to become the power status master: %v", err)
@@ -1063,7 +1063,7 @@ func startPowerStatusMaster(lastUpdated time.Time) {
 				return
 			}
 			now := time.Now()
-			success, err := (*kvStore).TASPowerStatusMaster(now, lastUpdated)
+			success, err := kvStore.TASPowerStatusMaster(now, lastUpdated)
 			if err != nil {
 				glogger.Errorf("ERROR while trying to refresh power status master: %v", err)
 				continue
