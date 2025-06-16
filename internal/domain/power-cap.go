@@ -38,12 +38,13 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base/v2"
-	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
 	"github.com/Cray-HPE/hms-xname/xnametypes"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
+	"github.com/OpenCHAMI/power-control/v2/internal/logger"
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 ///////////////////////////
@@ -397,11 +398,11 @@ func doPowerCapTask(taskID uuid.UUID) {
 	}
 
 	defer logger.Log.Infof("Power Capping Task %s Completed (%s)",
-						   task.TaskID.String(), GLOB.PodName)
+		task.TaskID.String(), GLOB.PodName)
 
 	if task.Type == model.PowerCapTaskTypePatch {
 		logger.Log.Infof("Starting Power Capping Patch Task %s - %v (%s)",
-						 task.TaskID.String(), *task.PatchParameters, GLOB.PodName)
+			task.TaskID.String(), *task.PatchParameters, GLOB.PodName)
 		taskIsPatch = true
 		for _, param := range task.PatchParameters.Components {
 			xnames = append(xnames, param.Xname)
@@ -416,7 +417,7 @@ func doPowerCapTask(taskID uuid.UUID) {
 		}
 	} else {
 		logger.Log.Infof("Starting Power Capping Snapshot Task %s - %v (%s)",
-						 task.TaskID.String(), *task.SnapshotParameters, GLOB.PodName)
+			task.TaskID.String(), *task.SnapshotParameters, GLOB.PodName)
 		xnames = task.SnapshotParameters.Xnames
 	}
 
@@ -498,7 +499,7 @@ func doPowerCapTask(taskID uuid.UUID) {
 				// Check that the power control that we want to affect exists in HSM.
 				// We won't operate on it if it doesn't.
 				found := false
-				for name, _ := range ctlMap {
+				for name := range ctlMap {
 					if _, ok := comp.PowerCaps[name]; !ok {
 						op := model.NewPowerCapOperation(task.TaskID, task.Type)
 						op.Component.Xname = id
@@ -713,15 +714,15 @@ func doPowerCapTask(taskID uuid.UUID) {
 	}
 
 	if len(trsTaskList) > 0 {
-		logger.Log.Infof("%s: Initiating %d/%d power cap requests to BMCs " +
-						 "(timeout %v) (%s)", fname, trsTaskIdx, len(goodOps),
-						 GLOB.BaseTRSTask.Timeout, GLOB.PodName)
+		logger.Log.Infof("%s: Initiating %d/%d power cap requests to BMCs "+
+			"(timeout %v) (%s)", fname, trsTaskIdx, len(goodOps),
+			GLOB.BaseTRSTask.Timeout, GLOB.PodName)
 
 		rchan, err := (*GLOB.RFTloc).Launch(&trsTaskList)
 		if err != nil {
 			logrus.Error(err)
 		}
-		for _, _ = range trsTaskList {
+		for range trsTaskList {
 			var taskErr error
 			var rfPower Power
 			tdone := <-rchan
@@ -772,10 +773,10 @@ func doPowerCapTask(taskID uuid.UUID) {
 				for _, pwrCtl := range rfPower.PowerCtl {
 					if pwrCtl.PowerConsumedWatts != nil {
 						switch v := (*pwrCtl.PowerConsumedWatts).(type) {
-						case float64:	// Convert to int
+						case float64: // Convert to int
 							*pwrCtl.PowerConsumedWatts = int(math.Round(v))
-						case int:		// noop - no conversion needed
-						default:		// unexpected type, set to zero
+						case int: // noop - no conversion needed
+						default: // unexpected type, set to zero
 							*pwrCtl.PowerConsumedWatts = int(0)
 							logger.Log.WithFields(logrus.Fields{"type": reflect.TypeOf(*pwrCtl.PowerConsumedWatts), "value": *pwrCtl.PowerConsumedWatts}).Errorf("Unexpected type/value detected for PowerConsumedWatts, setting to 0\n")
 						}
@@ -806,7 +807,7 @@ func doPowerCapTask(taskID uuid.UUID) {
 		(*GLOB.RFTloc).Close(&trsTaskList)
 		close(rchan)
 		logger.Log.Infof("%s: Done processing BMC responses (%s)",
-						 fname, GLOB.PodName)
+			fname, GLOB.PodName)
 	}
 
 	// Task Complete
@@ -1058,7 +1059,9 @@ func powerCapReaper() {
 		// Find the oldest 'numDelete' records and delete them.
 		tasksToDelete := make([]*model.PowerCapTask, numDelete)
 		for t, task := range tasks {
-			if task.TaskStatus != model.PowerCapTaskStatusCompleted { continue }
+			if task.TaskStatus != model.PowerCapTaskStatusCompleted {
+				continue
+			}
 			for i := 0; i < numDelete; i++ {
 				if tasksToDelete[i] == nil {
 					tasksToDelete[i] = &tasks[t]

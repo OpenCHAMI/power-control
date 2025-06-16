@@ -39,6 +39,8 @@ import (
 	base "github.com/Cray-HPE/hms-base/v2"
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
+	"github.com/sirupsen/logrus"
+
 	"github.com/OpenCHAMI/power-control/v2/internal/api"
 	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
 	"github.com/OpenCHAMI/power-control/v2/internal/domain"
@@ -50,7 +52,6 @@ import (
 	pg "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

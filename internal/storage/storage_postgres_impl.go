@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 type PostgresConfig struct {

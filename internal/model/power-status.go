@@ -27,8 +27,8 @@ import (
 	"strings"
 )
 
-//This pattern is from : https://yourbasic.org/golang/iota/
-//I think the only think we ever have to really worry about is ever changing the order of this (add/remove/re-order)
+// This pattern is from : https://yourbasic.org/golang/iota/
+// I think the only think we ever have to really worry about is ever changing the order of this (add/remove/re-order)
 type PowerStateFilter int
 
 const (
@@ -49,11 +49,11 @@ func ToPowerStateFilter(psf string) (PSF PowerStateFilter, err error) {
 		return
 	}
 	if strings.ToLower(psf) == "on" ||
-	   strings.ToLower(psf) == "poweringoff" {
+		strings.ToLower(psf) == "poweringoff" {
 		PSF = PowerStateFilter_On
 		err = nil
 	} else if strings.ToLower(psf) == "off" ||
-	          strings.ToLower(psf) == "poweringon" {
+		strings.ToLower(psf) == "poweringon" {
 		PSF = PowerStateFilter_Off
 		err = nil
 	} else if strings.ToLower(psf) == "undefined" {
@@ -67,7 +67,7 @@ func ToPowerStateFilter(psf string) (PSF PowerStateFilter, err error) {
 }
 
 func (psf PowerStateFilter) String() string {
-	if (int(psf) < 0) {
+	if int(psf) < 0 {
 		return "invalid"
 	}
 	return [...]string{"on", "off", "undefined"}[psf]
@@ -108,13 +108,13 @@ func ToManagementStateFilter(msf string) (MSF ManagementStateFilter, err error) 
 }
 
 func (msf ManagementStateFilter) String() string {
-	if (int(msf) < 0) {
+	if int(msf) < 0 {
 		return "invalid"
 	}
 	return [...]string{"available", "unavailable", "undefined"}[msf]
 }
 
-//https://levelup.gitconnected.com/implementing-enums-in-golang-9537c433d6e2
+// https://levelup.gitconnected.com/implementing-enums-in-golang-9537c433d6e2
 func (msf ManagementStateFilter) EnumIndex() int {
 	return int(msf)
 }
@@ -133,7 +133,7 @@ type PowerStatus struct {
 }
 
 type PowerStatusParameter struct {
-	Xnames                    []string   `json:"xname"`
-	PowerStateFilter          string     `json:"powerStateFilter"`
-	ManagementStateFilter     string     `json:"managementStateFilter"`
+	Xnames                []string `json:"xname"`
+	PowerStateFilter      string   `json:"powerStateFilter"`
+	ManagementStateFilter string   `json:"managementStateFilter"`
 }

@@ -24,9 +24,10 @@ package model
 
 import (
 	"errors"
-	"github.com/stretchr/testify/suite"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 )
 
 type ErrorPayloadTS struct {
