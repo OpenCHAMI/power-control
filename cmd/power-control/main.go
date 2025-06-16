@@ -40,13 +40,6 @@ import (
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/sirupsen/logrus"
-
-	"github.com/OpenCHAMI/power-control/v2/internal/api"
-	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
-	"github.com/OpenCHAMI/power-control/v2/internal/domain"
-	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/OpenCHAMI/power-control/v2/internal/storage"
 	"github.com/golang-migrate/migrate/v4"
 	db "github.com/golang-migrate/migrate/v4/database"
 	pg "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -54,6 +47,13 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/api"
+	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
+	"github.com/OpenCHAMI/power-control/v2/internal/domain"
+	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
+	"github.com/OpenCHAMI/power-control/v2/internal/logger"
+	"github.com/OpenCHAMI/power-control/v2/internal/storage"
 )
 
 // Default Port to use
