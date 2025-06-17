@@ -39,3 +39,10 @@ func (p *PostgresLockProvider) Unlock() error {
 func (p *PostgresLockProvider) GetDuration() time.Duration {
 	return p.Duration
 }
+
+func (p *PostgresLockProvider) Close() error {
+	if p.db != nil {
+		return p.db.Close()
+	}
+	return nil
+}

@@ -140,3 +140,10 @@ func (d *ETCDLockProvider) Unlock() error {
 func (d *ETCDLockProvider) GetDuration() time.Duration {
 	return d.Duration
 }
+
+func (d *ETCDLockProvider) Close() error {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	return d.kvHandle.Close()
+}

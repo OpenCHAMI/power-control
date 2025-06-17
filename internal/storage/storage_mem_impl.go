@@ -214,3 +214,7 @@ func (m *MEMStorage) TASTransition(transition model.Transition, testVal model.Tr
 	e := toETCDStorage(m)
 	return e.TASTransition(transition, testVal)
 }
+
+func (m *MEMStorage) Close() error {
+	return toETCDStorage(m).Close()
+}

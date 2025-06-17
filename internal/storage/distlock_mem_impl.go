@@ -117,3 +117,7 @@ func (d *MEMLockProvider) Unlock() error {
 func (d *MEMLockProvider) GetDuration() time.Duration {
 	return d.Duration
 }
+
+func (d *MEMLockProvider) Close() error {
+	return toDistLockETCD(d).Close()
+}
