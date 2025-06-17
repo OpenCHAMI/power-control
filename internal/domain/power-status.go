@@ -416,7 +416,7 @@ func getVaultCredsAll(compMap map[string]*componentPowerInfo) error {
 	//The credstore layer caches creds, so this should be fast.
 
 	for k, v := range compMap {
-		un, pw, err = (ccStore).GetControllerCredentials(k)
+		un, pw, err = ccStore.GetControllerCredentials(k)
 		if err != nil {
 			return fmt.Errorf("ERROR: Can't get BMC creds for '%s': %v", k, err)
 		}
@@ -1004,13 +1004,13 @@ func toPCSPowerActions(rfPowerActions []string) []string {
 // If it has been awhile since the last update, attempt to
 // become the new master.
 func getPowerStatusMaster() bool {
-	lockErr := (distLocker).DistributedTimedLock(distLockMaxTime)
+	lockErr := distLocker.DistributedTimedLock(distLockMaxTime)
 	if lockErr != nil {
 		// Someone else is already doing this check which means we aren't going to be master.
 		return false
 	}
 	defer func() {
-		unlockErr := (distLocker).Unlock()
+		unlockErr := distLocker.Unlock()
 		if unlockErr != nil {
 			glogger.Errorf("ERROR releasing distributed lock: %v", unlockErr)
 		}
