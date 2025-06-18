@@ -18,10 +18,6 @@ func (p *PostgresLockProvider) Init(Logger *logrus.Logger) error {
 	return nil
 }
 
-func (p *PostgresLockProvider) InitFromStorage(m interface{}, Logger *logrus.Logger) {
-
-}
-
 func (p *PostgresLockProvider) Ping() error {
 	return nil
 }
