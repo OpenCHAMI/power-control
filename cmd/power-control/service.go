@@ -246,7 +246,9 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig) 
 		}
 		DSP = tmpStorageImplementation
 		logger.Log.Info("Storage Provider: Postgres")
-		tmpDistLockImplementation := &storage.PostgresLockProvider{}
+		tmpDistLockImplementation := &storage.PostgresLockProvider{
+			Config: *postgres,
+		}
 		DLOCK = tmpDistLockImplementation
 		logger.Log.Info("Distributed Lock Provider: Postgres")
 	} else {
