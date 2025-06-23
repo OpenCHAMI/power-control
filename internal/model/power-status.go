@@ -120,12 +120,12 @@ func (msf ManagementStateFilter) EnumIndex() int {
 }
 
 type PowerStatusComponent struct {
-	XName                     string   `json:"xname"`
-	PowerState                string   `json:"powerState"`
-	ManagementState           string   `json:"managementState"`
-	Error                     string   `json:"error"`
-	SupportedPowerTransitions []string `json:"supportedPowerTransitions"`
-	LastUpdated               string   `json:"lastUpdated"` //RFC3339Nano
+	XName                     string   `json:"xname" db:"xname"`
+	PowerState                string   `json:"powerState" db:"power_state"`
+	ManagementState           string   `json:"managementState" db:"management_state"`
+	Error                     string   `json:"error" db:"error"`
+	SupportedPowerTransitions []string `json:"supportedPowerTransitions" db:"supported_power_transitions"`
+	LastUpdated               string   `json:"lastUpdated" db:"last_updated"` //RFC3339Nano
 }
 
 type PowerStatus struct {

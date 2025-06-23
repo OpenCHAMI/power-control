@@ -20,4 +20,22 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 
-CREATE SCHEMA IF NOT EXISTS pcsdb;
+
+CREATE TABLE IF NOT EXISTS power_status_component (
+	"xname" VARCHAR(255) NOT NULL,
+	"power_state" VARCHAR(255) NOT NULL,
+	"management_state" VARCHAR(255) NOT NULL,
+	"error" TEXT,
+	"supported_power_transitions" VARCHAR(255)[],
+	-- last_updated in the interface is a string, but we use TIMESTAMPTZ as it
+	-- is a timestamp.
+	"last_updated" TIMESTAMPTZ,
+	PRIMARY KEY ("xname")
+);
+
+
+CREATE TABLE IF NOT EXISTS power_status_master (
+    singleton INTEGER PRIMARY KEY DEFAULT 1,
+    last_updated TIMESTAMPTZ NOT NULL,
+    CHECK (singleton = 1)
+);

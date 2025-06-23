@@ -78,7 +78,8 @@ func createStorageProvider() (StorageProvider, error) {
 		provider = &ETCDStorage{}
 	case "POSTGRES":
 		// TODO Setup postgres config here
-		provider = &PostgresStorage{}
+		config := DefaultPostgresConfig()
+		provider = &PostgresStorage{Config: config}
 	default:
 		return nil, fmt.Errorf("Unknown storage type: %s", storage)
 	}
