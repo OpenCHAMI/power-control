@@ -324,7 +324,8 @@ func buildPowerCapResponse(task model.PowerCapTask, ops []model.PowerCapOperatio
 		TaskStatus:              task.TaskStatus,
 	}
 
-	// Is a compressed record
+	// task.IsCompressed == true when the task is complete. compressAndCompleteTask populates a summary of the task's
+	// operations in TaskCounts and Components.
 	if task.IsCompressed {
 		rsp.TaskCounts = task.TaskCounts
 		if full {
@@ -333,6 +334,7 @@ func buildPowerCapResponse(task model.PowerCapTask, ops []model.PowerCapOperatio
 		return rsp
 	}
 
+	// for incomplete tasks, we build the task count and component list from the currently active set of operations.
 	counts := model.PowerCapTaskCounts{}
 	componentMap := make(map[string]model.PowerCapComponent)
 	for _, op := range ops {

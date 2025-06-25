@@ -335,35 +335,124 @@ func (p *PostgresStorage) GetPowerStatusHierarchy(xname string) (ps model.PowerS
 }
 
 func (p *PostgresStorage) StorePowerCapTask(task model.PowerCapTask) error {
+	// no clue whether upserts should override the parameters field, so defaulting to yes given that etcd clobbers all
+	exec := `INSERT INTO power_cap_tasks (
+		id,
+		type,
+		created,
+		expires,
+		status,
+		snapshot_parameters,
+		patch_parameters,
+		compressed,
+		task_counts,
+		components
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	ON CONFLICT (id) DO UPDATE SET
+	status = excluded.status,
+	snapshot_parameters = excluded.snapshot_parameters,
+	patch_parameters = excluded.patch_parameters,
+	compressed = excluded.compressed,
+	task_counts = excluded.task_counts,
+	components = excluded.components
+	`
+	_, err := p.db.Exec(
+		exec,
+		task.TaskID,
+		task.Type,
+		task.TaskCreateTime,
+		task.AutomaticExpirationTime,
+		task.TaskStatus,
+		task.SnapshotParameters,
+		task.PatchParameters,
+		// after after a Task is completed:
+		// IsCompressed is set to true
+		// the TaskCounts and Components fields are set to a summary of Operations
+		// these are otherwise false and empty
+		task.IsCompressed,
+		task.TaskCounts,
+		task.Components,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to store task '%s': %w", task.TaskID, err)
+	}
 	return nil
 }
 
 func (p *PostgresStorage) StorePowerCapOperation(op model.PowerCapOperation) error {
+	exec := `INSERT INTO power_cap_operations (
+		id,
+		task_id,
+		type,
+		status,
+		component
+	) VALUES ($1, $2, $3, $4, $5)
+	ON CONFLICT (id) DO UPDATE SET
+	status = excluded.status
+	`
+	_, err := p.db.Exec(
+		exec,
+		op.OperationID,
+		op.TaskID,
+		op.Type,
+		op.Status,
+		op.Component,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to store operation '%s': %w", op.OperationID, err)
+	}
 	return nil
 }
 
 func (p *PostgresStorage) GetPowerCapTask(taskID uuid.UUID) (model.PowerCapTask, error) {
-	return model.PowerCapTask{}, nil
+	var task model.PowerCapTask
+	err := p.db.Get(&task, "SELECT * FROM power_cap_tasks WHERE id = $1", taskID)
+	if err != nil {
+		return model.PowerCapTask{}, fmt.Errorf("could not retrieve power cap task %s: %w", taskID, err)
+	}
+
+	return task, nil
 }
 
-func (p *PostgresStorage) GetPowerCapOperation(taskID uuid.UUID, opID uuid.UUID) (model.PowerCapOperation, error) {
-	return model.PowerCapOperation{}, nil
+func (p *PostgresStorage) GetPowerCapOperation(_ uuid.UUID, opID uuid.UUID) (model.PowerCapOperation, error) {
+	// this function never actually gets used :( downstream code only uses GetAllPowerCapOperationsForTask
+	var op model.PowerCapOperation
+	// the first ID is the task ID. etcd needs this to build the op key, we toss it
+	err := p.db.Get(&op, "SELECT * FROM power_cap_operations WHERE id = $1", opID)
+	if err != nil {
+		return model.PowerCapOperation{}, fmt.Errorf("could not retrieve power cap operation %s: %w", opID, err)
+	}
+
+	return op, nil
 }
 
 func (p *PostgresStorage) GetAllPowerCapOperationsForTask(taskID uuid.UUID) ([]model.PowerCapOperation, error) {
-	return nil, nil
+	ops := []model.PowerCapOperation{}
+	err := p.db.Select(&ops, "SELECT * FROM power_cap_operations WHERE task_id = $1", taskID)
+	if err != nil {
+		return []model.PowerCapOperation{}, err
+	}
+	return ops, nil
 }
 
 func (p *PostgresStorage) GetAllPowerCapTasks() ([]model.PowerCapTask, error) {
-	return nil, nil
+	tasks := []model.PowerCapTask{}
+	err := p.db.Select(&tasks, "SELECT * FROM power_cap_tasks")
+	if err != nil {
+		return []model.PowerCapTask{}, fmt.Errorf("could not retrieve power cap tasks: %w", err)
+	}
+	return tasks, nil
 }
 
 func (p *PostgresStorage) DeletePowerCapTask(taskID uuid.UUID) error {
-	return nil
+	_, err := p.db.Exec("DELETE FROM power_cap_tasks WHERE id = $1", taskID)
+	return err
 }
 
-func (p *PostgresStorage) DeletePowerCapOperation(taskID uuid.UUID, opID uuid.UUID) error {
-	return nil
+func (p *PostgresStorage) DeletePowerCapOperation(_ uuid.UUID, opID uuid.UUID) error {
+	// the first ID is the task ID. etcd needs this to build the op key, we toss it
+	_, err := p.db.Exec("DELETE FROM power_cap_operations WHERE id = $1", opID)
+	return err
 }
 
 func (p *PostgresStorage) StoreTransition(transition model.Transition) error {

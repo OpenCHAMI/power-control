@@ -23,6 +23,9 @@
 package model
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -61,8 +64,39 @@ type PowerCapSnapshotParameter struct {
 	Xnames []string `json:"xnames"`
 }
 
+func (p PowerCapSnapshotParameter) Value() (driver.Value, error) {
+	// PowerCapSnapshotParameter is effectively []string; it's a struct with a single []string field to hold Xnames.
+	// I'd like to use pq.StringArray(p.Xnames) as the Value() return and store these in a Postgres array, but that's
+	// not allowed. It results in:
+	// sql: converting argument $6 type: non-Value type pq.StringArray returned from Value
+	// when attempting to insert.
+	return json.Marshal(p)
+}
+
+func (p *PowerCapSnapshotParameter) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &p)
+}
+
 type PowerCapPatchParameter struct {
 	Components []PowerCapComponentParameter `json:"components"`
+}
+
+func (p PowerCapPatchParameter) Value() (driver.Value, error) {
+	return json.Marshal(p)
+}
+
+func (p *PowerCapPatchParameter) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &p)
 }
 
 type PowerCapComponentParameter struct {
@@ -80,28 +114,40 @@ type PowerCapControlParameter struct {
 //////////////
 
 type PowerCapTask struct {
-	TaskID                  uuid.UUID                  `json:"taskID"`
-	Type                    string                     `json:"type"`
-	SnapshotParameters      *PowerCapSnapshotParameter `json:"snapshotParameters,omitempty"`
-	PatchParameters         *PowerCapPatchParameter    `json:"patchParameters,omitempty"`
-	TaskCreateTime          time.Time                  `json:"taskCreateTime"`
-	AutomaticExpirationTime time.Time                  `json:"automaticExpirationTime"`
-	TaskStatus              string                     `json:"taskStatus"`
+	TaskID                  uuid.UUID                  `json:"taskID" db:"id"`
+	Type                    string                     `json:"type" db:"type"`
+	SnapshotParameters      *PowerCapSnapshotParameter `json:"snapshotParameters,omitempty" db:"snapshot_parameters"`
+	PatchParameters         *PowerCapPatchParameter    `json:"patchParameters,omitempty" db:"patch_parameters"`
+	TaskCreateTime          time.Time                  `json:"taskCreateTime" db:"created"`
+	AutomaticExpirationTime time.Time                  `json:"automaticExpirationTime" db:"expires"`
+	TaskStatus              string                     `json:"taskStatus" db:"status"`
 	OperationIDs            []uuid.UUID
 
-	// Only populated when the task is completed
-	IsCompressed bool                `json:"isCompressed"`
-	TaskCounts   PowerCapTaskCounts  `json:"taskCounts"`
-	Components   []PowerCapComponent `json:"components,omitempty"`
+	// Only populated when the task is completed, but stored in the DB, not just calculated. these save an operation
+	// list summary, since we delete operation rows after completing a task.
+	IsCompressed bool                   `json:"isCompressed" db:"compressed"`
+	TaskCounts   PowerCapTaskCounts     `json:"taskCounts" db:"task_counts,omitempty"`
+	Components   PowerCapComponentSlice `json:"components,omitempty" db:"components,omitempty"`
 }
 
 type PowerCapOperation struct {
-	OperationID uuid.UUID         `json:"operationID"`
-	TaskID      uuid.UUID         `json:"taskID"`
-	Type        string            `json:"type"`
-	Status      string            `json:"status"`
-	Component   PowerCapComponent `json:"Component"`
+	OperationID uuid.UUID         `json:"operationID" db:"id"`
+	TaskID      uuid.UUID         `json:"taskID" db:"task_id"`
+	Type        string            `json:"type" db:"type"`
+	Status      string            `json:"status" db:"status"`
+	Component   PowerCapComponent `json:"Component" db:"component"`
 
+	// unclear if we should store this in the DB. as best I can tell these are always pulled from SMD when we need to
+	// use them. AFAICT we never skip a pull from SMD if we've pulled this data previously.
+	//
+	// These are populated and used in domain.doPowerCapTask(), and its child functions
+	// domain.generatePowerCapPayload() and domain.parsePowerCapRFData(). The PowerCapOperation fields are direct
+	// copies of values from a https://github.com/Cray-HPE/hms-power-control/blob/v2.13.0/internal/hsm/models.go#L63-L81
+	// struct.
+	//
+	// The etcd storage engine does persist these by virtue of saving complete objects, but since PCS apparently
+	// doesn't use the stored values and isn't authoritative for them, they're omitted from the Postgres schema.
+	//
 	// From HSM /Inventory/ComponentEndpoints
 	RfFQDN                string                  `json:"RfFQDN"`
 	PowerCapURI           string                  `json:"powerCapURI"`
@@ -124,13 +170,13 @@ type PowerCapTaskRespArray struct {
 }
 
 type PowerCapTaskResp struct {
-	TaskID                  uuid.UUID           `json:"taskID"`
-	Type                    string              `json:"type"`
-	TaskCreateTime          time.Time           `json:"taskCreateTime"`
-	AutomaticExpirationTime time.Time           `json:"automaticExpirationTime"`
-	TaskStatus              string              `json:"taskStatus"`
-	TaskCounts              PowerCapTaskCounts  `json:"taskCounts"`
-	Components              []PowerCapComponent `json:"components,omitempty"`
+	TaskID                  uuid.UUID              `json:"taskID"`
+	Type                    string                 `json:"type"`
+	TaskCreateTime          time.Time              `json:"taskCreateTime"`
+	AutomaticExpirationTime time.Time              `json:"automaticExpirationTime"`
+	TaskStatus              string                 `json:"taskStatus"`
+	TaskCounts              PowerCapTaskCounts     `json:"taskCounts"`
+	Components              PowerCapComponentSlice `json:"components,omitempty"`
 }
 
 type PowerCapTaskCounts struct {
@@ -142,11 +188,52 @@ type PowerCapTaskCounts struct {
 	Unsupported int `json:"un-supported"`
 }
 
+func (p PowerCapTaskCounts) Value() (driver.Value, error) {
+	return json.Marshal(p)
+}
+
+func (p *PowerCapTaskCounts) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &p)
+}
+
 type PowerCapComponent struct {
 	Xname          string             `json:"xname"`
 	Error          string             `json:"error,omitempty"`
 	Limits         *PowerCapabilities `json:"limits,omitempty"`
 	PowerCapLimits []PowerCapControls `json:"powerCapLimits,omitempty"`
+}
+
+func (p PowerCapComponent) Value() (driver.Value, error) {
+	return json.Marshal(p)
+}
+
+func (p *PowerCapComponent) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &p)
+}
+
+type PowerCapComponentSlice []PowerCapComponent
+
+func (p PowerCapComponentSlice) Value() (driver.Value, error) {
+	return json.Marshal(p)
+}
+
+func (p *PowerCapComponentSlice) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &p)
 }
 
 type PowerCapabilities struct {
