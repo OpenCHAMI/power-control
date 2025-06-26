@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS transition_locations (
 	"deputy_key" VARCHAR(255),
 	-- Locations have no independent CRUD functions and are tied to a specific transition ID, so while they're
 	-- sorta separate objects, they become inaccessible without their attached transition.
-	FOREIGN KEY ("transition_id") REFERENCES transitions ("id") ON DELETE CASCADE
+	FOREIGN KEY ("transition_id") REFERENCES transitions ("id") ON DELETE CASCADE,
+	UNIQUE ("transition_id", "xname")
 );
 
 CREATE INDEX idx_transition_locations ON transition_locations (transition_id);

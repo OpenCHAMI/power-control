@@ -203,10 +203,23 @@ func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
 	}
 	defer tx.Rollback()
 
+	err = storeTransitionWithTx(tx, transition)
+	if err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("Failed to commit transition '%s': %w", transition.TransitionID, err)
+	}
+	return nil
+}
+
+// storeTransitionWithTx is a helper that upserts a Transition and its Locations within a given transaction. The caller
+// is responsible for committing or rolling back the transaction.
+func storeTransitionWithTx(tx *sqlx.Tx, transition model.Transition) error {
 	exec := `INSERT INTO transitions (id, operation, deadline, created, active, expires, status)
 	VALUES ($1, $2, $3, $4, $5, $6, $7)
 	ON CONFLICT (id) DO UPDATE SET active = excluded.active, status = excluded.status`
-	_, err = tx.Exec(
+	_, err := tx.Exec(
 		exec,
 		transition.TransitionID,
 		transition.Operation,
@@ -220,7 +233,17 @@ func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
 		return fmt.Errorf("Failed to store transition '%s': %w", transition.TransitionID, err)
 	}
 	for _, l := range transition.Location {
-		exec = `INSERT INTO transition_locations (transition_id, xname, deputy_key) VALUES ($1, $2, $3)`
+		// Locations enforce unique transition ID+xname pairs in the Postgres
+		// model. This is a best guess appropriate behavior given what
+		// Locations represent (a credential used for a given Xname within a
+		// Transition). The original etcd logic simply clobbers the list on
+		// upsert because it's a naive JSON blob update. Absent a solid idea of
+		// how these _should_ work in an ideal model, The DO NOTHING here is a
+		// simple way to handle upserts without special cases for new versus
+		// existing transitions.
+		exec = `INSERT INTO transition_locations (transition_id, xname, deputy_key)
+		VALUES ($1, $2, $3)
+		ON CONFLICT DO NOTHING`
 		_, err := tx.Exec(
 			exec,
 			transition.TransitionID,
@@ -230,9 +253,6 @@ func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
 		if err != nil {
 			return fmt.Errorf("Failed to store transition '%s': %w", transition.TransitionID, err)
 		}
-	}
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("Failed to commit transition '%s': %w", transition.TransitionID, err)
 	}
 	return nil
 }
@@ -343,25 +363,13 @@ func (p *PostgresStorage) TASTransition(transition model.Transition, testVal mod
 		return false, fmt.Errorf("could retrieve TAS transition: %w", err)
 	}
 	// []Location is not comparable. I'm unsure if we'd want to do a set equality check on it (AFAIK it is a set in
-	// practice), since they're not part of the transition per se, just stored with it in the etcd data model.
-	// Insofar as the etcd implementation _does not_ check all pages, I believe it de facto ignores Locations.
+	// practice). The etcd implementation _does not_ check all pages, so it de facto ignores Locations.
 	if cmp.Equal(testVal, current, cmpopts.IgnoreFields(model.Transition{}, "Location")) {
 		_, err := tx.Exec("DELETE FROM transitions WHERE id = $1", transition.TransitionID)
 		if err != nil {
 			return false, fmt.Errorf("could not replace TAS transition: %w", err)
 		}
-		exec := `INSERT INTO transitions (id, operation, deadline, created, active, expires, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`
-		_, err = tx.Exec(
-			exec,
-			transition.TransitionID,
-			transition.Operation,
-			transition.TaskDeadline,
-			transition.CreateTime,
-			transition.LastActiveTime,
-			transition.AutomaticExpirationTime,
-			transition.Status,
-		)
+		err = storeTransitionWithTx(tx, transition)
 		if err != nil {
 			return false, fmt.Errorf("could not replace TAS transition: %w", err)
 		}
