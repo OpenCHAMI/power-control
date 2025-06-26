@@ -339,7 +339,7 @@ func (p *PostgresStorage) TASTransition(transition model.Transition, testVal mod
 	if cmp.Equal(testVal, current, cmpopts.IgnoreFields(model.Transition{}, "Location")) {
 		_, err := tx.Exec("DELETE FROM transitions WHERE id = $1", transition.TransitionID)
 		if err != nil {
-			return false, fmt.Errorf("could replace TAS transition: %w", err)
+			return false, fmt.Errorf("could not replace TAS transition: %w", err)
 		}
 		exec := `INSERT INTO transitions (id, operation, deadline, created, active, expires, status)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`
@@ -354,7 +354,7 @@ func (p *PostgresStorage) TASTransition(transition model.Transition, testVal mod
 			transition.Status,
 		)
 		if err != nil {
-			return false, fmt.Errorf("could replace TAS transition: %w", err)
+			return false, fmt.Errorf("could not replace TAS transition: %w", err)
 		}
 		if err = tx.Commit(); err != nil {
 			return false, fmt.Errorf("could not commit TAS transition: %w", err)
