@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS transitions (
 	"created" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	"active" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	"expires" TIMESTAMPTZ,
-	"status" VARCHAR(255) NOT NULL
+	"status" VARCHAR(255) NOT NULL,
+	-- An array of {xname, credential} structs. Managing these in a separate table makes data integrity more
+	-- more complicated, and we never interact with them directly like we do with transitions.
+	"location" JSON
 	-- iscompressed omitted. AFAIK this should be handled in app-side representation of the struct
 	-- taskcounts omitted. AFAIK this is also built app-side from the tasks
 );
@@ -52,19 +55,5 @@ CREATE TABLE IF NOT EXISTS transition_tasks (
 	-- them _before_ their associatied transition, so we can't enforce this as-is.
 	--FOREIGN KEY ("transition_id") REFERENCES transitions ("id") ON DELETE CASCADE
 );
-
-CREATE TABLE IF NOT EXISTS transition_locations (
-	"id" SERIAL PRIMARY KEY,
-	"transition_id" UUID NOT NULL,
-	"xname" VARCHAR(255) NOT NULL,
-	-- no idea what these actually look like in practice
-	"deputy_key" VARCHAR(255),
-	-- Locations have no independent CRUD functions and are tied to a specific transition ID, so while they're
-	-- sorta separate objects, they become inaccessible without their attached transition.
-	FOREIGN KEY ("transition_id") REFERENCES transitions ("id") ON DELETE CASCADE,
-	UNIQUE ("transition_id", "xname")
-);
-
-CREATE INDEX idx_transition_locations ON transition_locations (transition_id);
 
 COMMIT;

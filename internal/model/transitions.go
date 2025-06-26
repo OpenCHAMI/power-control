@@ -23,6 +23,8 @@
 package model
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -68,6 +70,21 @@ type LocationParameter struct {
 	DeputyKey string `json:"deputyKey,omitempty" db:"deputy_key"`
 }
 
+type LocationParameterSlice []LocationParameter
+
+func (l LocationParameterSlice) Value() (driver.Value, error) {
+	return json.Marshal(l)
+}
+
+func (l *LocationParameterSlice) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &l)
+}
+
 func ToTransition(parameter TransitionParameter, expirationTimeMins int) (TR Transition, err error) {
 	TR.TransitionID = uuid.New()
 	TR.Operation, err = ToOperationFilter(parameter.Operation)
@@ -97,7 +114,7 @@ type Transition struct {
 	// TaskDeadline is the time limit for completing the transition.
 	TaskDeadline int `json:"taskDeadlineMinutes" db:"deadline"`
 	// Location contains a list of xnames and associated credentials to apply the transition to.
-	Location []LocationParameter `json:"location"`
+	Location LocationParameterSlice `json:"location" db:"location"`
 	// CreateTime is the time the transition was requested.
 	CreateTime time.Time `json:"createTime" db:"created"`
 	// LastActiveTime is a timestamp the power service updates regularly as long as it considers the transition active.

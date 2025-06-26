@@ -23,5 +23,3 @@
 DROP TABLE IF EXISTS transitions;
 
 DROP TABLE IF EXISTS transition_tasks;
-
-DROP TABLE IF EXISTS transition_locations;

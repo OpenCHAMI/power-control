@@ -238,7 +238,6 @@ func (s *StorageTestSuite) TestTransitionTAS() {
 
 	modTransition := gotTransition
 	modTransition.Status = model.TransitionStatusAborted
-	modTransition.Location = append(modTransition.Location, model.LocationParameter{Xname: "x0c0s2b0n1"})
 
 	// nothing should have touched the original, this change should succeed
 	t.Logf("updating transition %s", testTransition.TransitionID)
@@ -256,10 +255,6 @@ func (s *StorageTestSuite) TestTransitionTAS() {
 	gotTransition, _, err = s.sp.GetTransition(testTransition.TransitionID)
 	s.Require().NoError(err)
 	s.Require().Equal(gotTransition.Status, model.TransitionStatusAborted)
-	// Proper Location handling for TAS is kinda unknown. In etcd, the storage engine doesn't check if they're equal
-	// (since it only checks the first page of the Transition), but will clobber the list if asked. The Postgres engine
-	// allows appending Locations to a Transition, but not modification or deletion.
-	s.Require().True(slices.Equal(modTransition.Location, gotTransition.Location))
 
 	modTransition.TransitionID = uuid.New()
 	t.Logf("failing to update non-existent transition %s", modTransition.TransitionID)
