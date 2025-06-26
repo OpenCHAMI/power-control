@@ -197,10 +197,16 @@ func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
 	// should update conflicts be able to update anything other than active and status? technically IDK if there's any
 	// expectation otherwise and etcd would just update the whole damn thing for a given key, but changing the
 	// operation and such after creation seems wrong, and potentially catastrophic
+	tx, err := p.db.Beginx()
+	if err != nil {
+		return fmt.Errorf("could not begin transaction for transition '%s': %w", transition.TransitionID, err)
+	}
+	defer tx.Rollback()
+
 	exec := `INSERT INTO transitions (id, operation, deadline, created, active, expires, status)
 	VALUES ($1, $2, $3, $4, $5, $6, $7)
 	ON CONFLICT (id) DO UPDATE SET active = excluded.active, status = excluded.status`
-	_, err := p.db.Exec(
+	_, err = tx.Exec(
 		exec,
 		transition.TransitionID,
 		transition.Operation,
@@ -215,7 +221,7 @@ func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
 	}
 	for _, l := range transition.Location {
 		exec = `INSERT INTO transition_locations (transition_id, xname, deputy_key) VALUES ($1, $2, $3)`
-		_, err := p.db.Exec(
+		_, err := tx.Exec(
 			exec,
 			transition.TransitionID,
 			l.Xname,
@@ -224,6 +230,9 @@ func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
 		if err != nil {
 			return fmt.Errorf("Failed to store transition '%s': %w", transition.TransitionID, err)
 		}
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("Failed to commit transition '%s': %w", transition.TransitionID, err)
 	}
 	return nil
 }
