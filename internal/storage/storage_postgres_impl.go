@@ -251,14 +251,14 @@ func (p *PostgresStorage) StoreTransitionTask(op model.TransitionTask) error {
 	return nil
 }
 
-// TRC the first page here is very etcd leaky abstraction. etcd GetTransition
-// TRC returns both the complete transition and its first page if paging is
-// TRC enabled. This first page is often discarded by downstream functions. AFAICT
-// TRC it's kept only when the function will perform a TAS afterwards, because the
-// TRC TAS relies on etcd-side comparisons and won't be able to compare against the
-// TRC full transition properly. This is kinda silly, but I guess the upshot is we
-// TRC don't really need to worry about it and can just return the same object
-// TRC twice, as it will just get fed back into our own TAS.
+// the first page here is very etcd leaky abstraction. etcd GetTransition
+// returns both the complete transition and its first page if paging is
+// enabled. This first page is often discarded by downstream functions. AFAICT
+// it's kept only when the function will perform a TAS afterwards, because the
+// TAS relies on etcd-side comparisons and won't be able to compare against the
+// full transition properly. This is kinda silly, but I guess the upshot is we
+// don't really need to worry about it and can just return the same object
+// twice, as it will just get fed back into our own TAS.
 
 func (p *PostgresStorage) GetTransition(transitionID uuid.UUID) (transition model.Transition, transitionFirstPage model.Transition, err error) {
 	err = p.db.Get(&transition, "SELECT * FROM transitions WHERE id = $1", transitionID)
@@ -274,8 +274,8 @@ func (p *PostgresStorage) GetTransition(transitionID uuid.UUID) (transition mode
 	return transition, transition, nil
 }
 
-// TRC more etcd leakage. this needs the transition ID because you can't build
-// TRC the etcd key for a task without the transition that owns it
+// more etcd leakage. this needs the transition ID because you can't build
+// the etcd key for a task without the transition that owns it
 
 func (p *PostgresStorage) GetTransitionTask(_ uuid.UUID, taskID uuid.UUID) (model.TransitionTask, error) {
 	var task model.TransitionTask
