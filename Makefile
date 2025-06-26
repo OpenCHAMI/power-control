@@ -31,15 +31,12 @@ image:
 	docker build --pull ${DOCKER_ARGS} --tag '${NAME}:${VERSION}' .
 
 # (Mostly) incorrectly-named integration tests. Some actual unit tests.
+# These spawn supporting containers via docker-compose and invoke "go test" from a test container in the compose network.
 unittest:
 	STORAGE=${STORAGE} ./runUnitTest.sh
 
-# Integration tests that require docker-compose to set up the environment before invoking "go test".
-integration:
-	./runIntegration.sh
-
 # Integration tests that spawn their own containers from Go.
-integration-standalone:
+integration:
 	PCS_TEST_STORAGE=${STORAGE} go test --tags=integration_tests ./...
 
 snyk:

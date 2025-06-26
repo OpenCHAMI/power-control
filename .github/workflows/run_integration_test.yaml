@@ -4,19 +4,7 @@ on:
   - pull_request
   - workflow_dispatch
 jobs:
-  run_integration_tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v4
-      - name: Install docker compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose make
-      - name: Run integration tests
-        run: make integration
-  # This job runs tests with the integration_tests tag. This currently only tests the storage package.
-  run_integration_new:
+  run_integration:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -34,4 +22,4 @@ jobs:
       - name: Run integration tests
         env:
           PCS_TEST_STORAGE: ${{ matrix.storage }}
-        run: make integration-standalone
+        run: make integration
