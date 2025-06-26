@@ -31,6 +31,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/etcd v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.37.0
+	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3
 )
 
 require (

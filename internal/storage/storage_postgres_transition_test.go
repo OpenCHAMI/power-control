@@ -3,10 +3,11 @@
 package storage
 
 import (
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
-	"github.com/google/uuid"
-
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/google/uuid"
+	"golang.org/x/exp/slices"
+
+	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 // TestTransitionSetGet tests setting and getting a single transition with several attached tasks.
@@ -84,6 +85,7 @@ func (s *StorageTestSuite) TestTransitionSetGet() {
 	s.Require().Equal(testTransition.TransitionID, gotTransition.TransitionID)
 	s.Require().Equal(testTransition.Operation, gotTransition.Operation)
 	s.Require().Equal(testTransition.TaskDeadline, gotTransition.TaskDeadline)
+	s.Require().True(slices.Equal(testTransition.Location, gotTransition.Location))
 
 	gotTask, err := s.sp.GetTransitionTask(task.TransitionID, task.TaskID)
 	s.Require().NoError(err)
