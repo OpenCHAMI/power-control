@@ -212,7 +212,7 @@ func (s *StorageTestSuite) TestDistributedLockGoRoutineRace() {
 		if err != nil {
 			t.Fatalf("could not create test DistLockProvider: %s", err)
 		}
-		provider.Init(log)
+		s.Require().NoError(provider.Init(log))
 
 		go acquireLock(provider, lockAttemptResults, &wg, log, &monitor)
 	}
