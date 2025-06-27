@@ -1,12 +1,14 @@
+
+//go:build integration_tests
+
 package storage
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/require"
 )
 
-func TestStorageProviderPing(t *testing.T) {
-	err := storageProvider.Ping()
+func (s *StorageTestSuite) TestStorageProviderPing() {
+	t := s.T()
+	err := s.sp.Ping()
 	require.NoError(t, err, "Storage Ping() should not have failed")
 }

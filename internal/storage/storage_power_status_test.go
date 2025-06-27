@@ -1,8 +1,9 @@
+//go:build integration_tests
+
 package storage
 
 import (
 	"fmt"
-	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -10,9 +11,10 @@ import (
 	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
-func TestGetPowerStatusMaster(t *testing.T) {
+func (s *StorageTestSuite) TestGetPowerStatusMaster() {
+	t := s.T()
 	// We make the assumption that we are dealing a clean DB here, we may not be!
-	_, err := storageProvider.GetPowerStatusMaster()
+	_, err := s.sp.GetPowerStatusMaster()
 	require.Error(t, err)
 
 	// Ensure that the contains the magic string that indicates the power status master does not exist!
@@ -21,46 +23,49 @@ func TestGetPowerStatusMaster(t *testing.T) {
 
 }
 
-func TestStorePowerStatusMaster(t *testing.T) {
+func (s *StorageTestSuite) TestStorePowerStatusMaster() {
+	t := s.T()
 	now := time.Now().Truncate(time.Microsecond)
 
-	err := storageProvider.StorePowerStatusMaster(now)
+	err := s.sp.StorePowerStatusMaster(now)
 	require.NoError(t, err)
 
-	lastUpdated, err := storageProvider.GetPowerStatusMaster()
+	lastUpdated, err := s.sp.GetPowerStatusMaster()
 	require.NoError(t, err)
 	require.WithinDuration(t, now, lastUpdated, time.Microsecond, "Stored power status master timestamp does not match the retrieved timestamp")
 }
 
-func TestTASPowerStatusMaster(t *testing.T) {
+func (s *StorageTestSuite) TestTASPowerStatusMaster() {
+	t := s.T()
 	now := time.Now()
 	newVal := now.Add(10 * time.Second)
 
 	// Store the power status master first
-	err := storageProvider.StorePowerStatusMaster(now)
+	err := s.sp.StorePowerStatusMaster(now)
 	require.NoError(t, err)
 
-	result, err := storageProvider.TASPowerStatusMaster(newVal, now)
+	result, err := s.sp.TASPowerStatusMaster(newVal, now)
 	require.NoError(t, err)
 	require.True(t, result, "TASPowerStatusMaster should return true")
 
 	// Now test with a value that is equal to the stored value
-	lastUpdated, err := storageProvider.GetPowerStatusMaster()
+	lastUpdated, err := s.sp.GetPowerStatusMaster()
 	require.NoError(t, err)
 	require.WithinDuration(t, newVal, lastUpdated, time.Microsecond, "Stored power status master timestamp does not match the retrieved timestamp")
 
 	// Now test with a value is differen from the stored value
-	result, err = storageProvider.TASPowerStatusMaster(now, time.Now())
+	result, err = s.sp.TASPowerStatusMaster(now, time.Now())
 	require.NoError(t, err)
 	require.False(t, result, "TASPowerStatusMaster should return false when the test value is less than the stored value")
 
 	// Now test the value has not changed
-	lastUpdated, err = storageProvider.GetPowerStatusMaster()
+	lastUpdated, err = s.sp.GetPowerStatusMaster()
 	require.NoError(t, err)
 	require.WithinDuration(t, newVal, lastUpdated, time.Microsecond, "Stored power status master timestamp does not match the retrieved timestamp")
 }
 
-func TestStorePowerStatus(t *testing.T) {
+func (s *StorageTestSuite) TestStorePowerStatus() {
+	t := s.T()
 	ps := model.PowerStatusComponent{
 		XName:                     "x0c0s0b0n0",
 		PowerState:                "on",
@@ -69,10 +74,10 @@ func TestStorePowerStatus(t *testing.T) {
 		Error:                     "OK",
 	}
 
-	err := storageProvider.StorePowerStatus(ps)
+	err := s.sp.StorePowerStatus(ps)
 	require.NoError(t, err)
 
-	retrievedPS, err := storageProvider.GetPowerStatus(ps.XName)
+	retrievedPS, err := s.sp.GetPowerStatus(ps.XName)
 	require.NoError(t, err)
 	require.Equal(t, ps.XName, retrievedPS.XName, "XName should match")
 	require.Equal(t, ps.PowerState, retrievedPS.PowerState, "PowerState should match")
@@ -82,15 +87,16 @@ func TestStorePowerStatus(t *testing.T) {
 
 	// Now try with LastUpdated set
 	ps.LastUpdated = time.Now().Truncate(time.Microsecond)
-	err = storageProvider.StorePowerStatus(ps)
+	err = s.sp.StorePowerStatus(ps)
 	require.NoError(t, err)
 
-	retrievedPS, err = storageProvider.GetPowerStatus(ps.XName)
+	retrievedPS, err = s.sp.GetPowerStatus(ps.XName)
 	require.NoError(t, err)
 	require.True(t, ps.LastUpdated.Equal(retrievedPS.LastUpdated), "LastUpdated should match")
 }
 
-func TestDeletePowerStatus(t *testing.T) {
+func (s *StorageTestSuite) TestDeletePowerStatus() {
+	t := s.T()
 	ps := model.PowerStatusComponent{
 		XName:                     "x0c0s0b0n0",
 		PowerState:                "on",
@@ -99,17 +105,18 @@ func TestDeletePowerStatus(t *testing.T) {
 		LastUpdated:               time.Now().Truncate(time.Microsecond),
 	}
 
-	err := storageProvider.StorePowerStatus(ps)
+	err := s.sp.StorePowerStatus(ps)
 	require.NoError(t, err)
 
-	err = storageProvider.DeletePowerStatus(ps.XName)
+	err = s.sp.DeletePowerStatus(ps.XName)
 	require.NoError(t, err)
 
-	_, err = storageProvider.GetPowerStatus(ps.XName)
+	_, err = s.sp.GetPowerStatus(ps.XName)
 	require.Error(t, err, "Expected error when retrieving deleted power status")
 }
 
-func TestGetPowerStatusAll(t *testing.T) {
+func (s *StorageTestSuite) TestGetPowerStatusAll() {
+	t := s.T()
 	ps := model.PowerStatusComponent{
 		XName:                     "x0c0s0b0n1",
 		PowerState:                "on",
@@ -124,12 +131,12 @@ func TestGetPowerStatusAll(t *testing.T) {
 	for ix := 0; ix <= maxIX; ix++ {
 		pst := ps
 		pst.XName = fmt.Sprintf("x%dc%ds%db%dn%d", ix, ix, ix, ix, ix)
-		err := storageProvider.StorePowerStatus(pst)
+		err := s.sp.StorePowerStatus(pst)
 		require.NoError(t, err, "StorePowerStatus() failed for %s", pst.XName)
 	}
 
 	// Retrieve all power status components
-	parr, paerr := storageProvider.GetAllPowerStatus()
+	parr, paerr := s.sp.GetAllPowerStatus()
 	require.NoError(t, paerr, "GetAllPowerStatus() failed")
 
 	paMap := make(map[string]*model.PowerStatusComponent)
@@ -145,7 +152,8 @@ func TestGetPowerStatusAll(t *testing.T) {
 	}
 }
 
-func TestGetPowerStatusHierarchy(t *testing.T) {
+func (s *StorageTestSuite) TestGetPowerStatusHierarchy() {
+	t := s.T()
 	ps := model.PowerStatusComponent{
 		XName:                     "x0c0s0b0n1",
 		PowerState:                "on",
@@ -167,12 +175,12 @@ func TestGetPowerStatusHierarchy(t *testing.T) {
 	for i := 0; i < numberOfComponents; i++ {
 		pst := ps
 		pst.XName = xnames[i]
-		err := storageProvider.StorePowerStatus(pst)
+		err := s.sp.StorePowerStatus(pst)
 		require.NoError(t, err, "StorePowerStatus() failed for %s", pst.XName)
 	}
 
 	// Retrieve with hierarchy
-	powerStatus, paerr := storageProvider.GetPowerStatusHierarchy(xnamePrefix)
+	powerStatus, paerr := s.sp.GetPowerStatusHierarchy(xnamePrefix)
 	require.NoError(t, paerr, "GetPowerStatusHierarchy() failed")
 	require.Equal(t, numberOfComponents, len(powerStatus.Status), "GetPowerStatusHierarchy() should return %d components, got %d",
 		numberOfComponents, len(powerStatus.Status))
@@ -183,17 +191,18 @@ func TestGetPowerStatusHierarchy(t *testing.T) {
 	}
 }
 
-func TestPowerStatusInvalidXName(t *testing.T) {
+func (s *StorageTestSuite) TestPowerStatusInvalidXName() {
+	t := s.T()
 	pErrComp := model.PowerStatusComponent{
 		XName: "xyzzy",
 	}
 
-	err := storageProvider.StorePowerStatus(pErrComp)
+	err := s.sp.StorePowerStatus(pErrComp)
 	require.Error(t, err, "StorePowerStatus() with bad XName should have failed, did not.")
 
-	err = storageProvider.DeletePowerStatus(pErrComp.XName)
+	err = s.sp.DeletePowerStatus(pErrComp.XName)
 	require.Error(t, err, "DeletePowerStatus() with bad XName should have failed, did not.")
 
-	_, err = storageProvider.GetPowerStatus(pErrComp.XName)
+	_, err = s.sp.GetPowerStatus(pErrComp.XName)
 	require.Error(t, err, "GetPowerStatus() with bad XName should have failed, did not.")
 }
