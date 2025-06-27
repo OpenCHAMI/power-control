@@ -4,14 +4,22 @@ on:
   - pull_request
   - workflow_dispatch
 jobs:
-  run_integration_tests:
+  run_integration:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        storage:
+          - MEMORY
+          - ETCD
+          - POSTGRES
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
-      - name: Install docker compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose make
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '>=1.24.0'
       - name: Run integration tests
+        env:
+          PCS_TEST_STORAGE: ${{ matrix.storage }}
         run: make integration

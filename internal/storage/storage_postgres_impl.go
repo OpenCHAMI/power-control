@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -23,6 +25,7 @@ type PostgresConfig struct {
 	RetryWait  uint64
 	Insecure   bool
 	Opts       string
+	ConnStr    string
 }
 
 func DefaultPostgresConfig() PostgresConfig {
@@ -61,16 +64,18 @@ func OpenDB(config PostgresConfig, log *logrus.Logger) (*sql.DB, error) {
 		sslmode = "disable"
 	}
 
-	connStr := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s", config.Host, config.Port, config.DBName, config.User, config.Password, sslmode)
-	if config.Opts != "" {
-		connStr += " " + config.Opts
+	if config.ConnStr == "" {
+		config.ConnStr = fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s", config.Host, config.Port, config.DBName, config.User, config.Password, sslmode)
+		if config.Opts != "" {
+			config.ConnStr += " " + config.Opts
+		}
 	}
 
 	// Connect to postgres, looping every retryWait seconds up to retryCount times.
 	for ; ix <= config.RetryCount; ix++ {
 		log.Printf("Attempting connection to Postgres at %s:%d (attempt %d)", config.Host, config.Port, ix)
 
-		db, err = sql.Open("postgres", connStr)
+		db, err = sql.Open("postgres", config.ConnStr)
 		if err != nil {
 			log.Printf("ERROR: failed to open connection to Postgres at %s:%d (attempt %d, retrying in %d seconds): %v\n", config.Host, config.Port, ix, config.RetryWait, err)
 		} else {
@@ -189,39 +194,174 @@ func (p *PostgresStorage) DeletePowerCapOperation(taskID uuid.UUID, opID uuid.UU
 }
 
 func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
+	// should update conflicts be able to update anything other than active and status? technically IDK if there's any
+	// expectation otherwise and etcd would just update the whole damn thing for a given key, but changing the
+	// operation and such after creation seems wrong, and potentially catastrophic
+	tx, err := p.db.Beginx()
+	if err != nil {
+		return fmt.Errorf("could not begin transaction for transition '%s': %w", transition.TransitionID, err)
+	}
+	defer tx.Rollback()
+
+	err = storeTransitionWithTx(tx, transition)
+	if err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("Failed to commit transition '%s': %w", transition.TransitionID, err)
+	}
+	return nil
+}
+
+// storeTransitionWithTx is a helper that upserts a Transition and its Locations within a given transaction. The caller
+// is responsible for committing or rolling back the transaction.
+func storeTransitionWithTx(tx *sqlx.Tx, transition model.Transition) error {
+	exec := `INSERT INTO transitions (
+		id,
+		operation,
+		deadline,
+		created,
+		active,
+		expires,
+		location,
+		status
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	ON CONFLICT (id) DO UPDATE SET active = excluded.active, status = excluded.status`
+	_, err := tx.Exec(
+		exec,
+		transition.TransitionID,
+		transition.Operation,
+		transition.TaskDeadline,
+		transition.CreateTime,
+		transition.LastActiveTime,
+		transition.AutomaticExpirationTime,
+		transition.Location,
+		transition.Status,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to store transition '%s': %w", transition.TransitionID, err)
+	}
 	return nil
 }
 
 func (p *PostgresStorage) StoreTransitionTask(op model.TransitionTask) error {
+	exec := `INSERT INTO transition_tasks (
+		id,
+		transition_id,
+		operation,
+		state,
+		xname,
+		reservation_key,
+		deputy_key,
+		status,
+		status_desc,
+		error
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	ON CONFLICT (id) DO UPDATE SET state = excluded.state, status = excluded.status, status_desc = excluded.status_desc, error = excluded.error`
+	_, err := p.db.Exec(
+		exec,
+		op.TaskID,
+		op.TransitionID,
+		op.Operation,
+		op.State,
+		op.Xname,
+		op.ReservationKey,
+		op.DeputyKey,
+		op.Status,
+		op.StatusDesc,
+		op.Error,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to store task '%s': %w", op.TaskID, err)
+	}
 	return nil
 }
 
+// the first page here is very etcd leaky abstraction. etcd GetTransition
+// returns both the complete transition and its first page if paging is
+// enabled. This first page is often discarded by downstream functions. AFAICT
+// it's kept only when the function will perform a TAS afterwards, because the
+// TAS relies on etcd-side comparisons and won't be able to compare against the
+// full transition properly. This is kinda silly, but I guess the upshot is we
+// don't really need to worry about it and can just return the same object
+// twice, as it will just get fed back into our own TAS.
+
+//
+
 func (p *PostgresStorage) GetTransition(transitionID uuid.UUID) (transition model.Transition, transitionFirstPage model.Transition, err error) {
-	return model.Transition{}, model.Transition{}, nil
+	err = p.db.Get(&transition, "SELECT * FROM transitions WHERE id = $1", transitionID)
+	if err != nil {
+		return model.Transition{}, model.Transition{}, err
+	}
+	return transition, transition, nil
 }
 
-func (p *PostgresStorage) GetTransitionTask(transitionID uuid.UUID, taskID uuid.UUID) (model.TransitionTask, error) {
-	return model.TransitionTask{}, nil
+// more etcd leakage. this needs the transition ID because you can't build
+// the etcd key for a task without the transition that owns it
+
+func (p *PostgresStorage) GetTransitionTask(_ uuid.UUID, taskID uuid.UUID) (model.TransitionTask, error) {
+	var task model.TransitionTask
+	err := p.db.Get(&task, "SELECT * FROM transition_tasks WHERE id = $1", taskID)
+	if err != nil {
+		return model.TransitionTask{}, err
+	}
+	return task, nil
 }
 
 func (p *PostgresStorage) GetAllTasksForTransition(transitionID uuid.UUID) ([]model.TransitionTask, error) {
-	return nil, nil
+	tasks := []model.TransitionTask{}
+	err := p.db.Select(&tasks, "SELECT * FROM transition_tasks WHERE transition_id = $1", transitionID)
+	if err != nil {
+		return []model.TransitionTask{}, err
+	}
+	return tasks, nil
 }
 
 func (p *PostgresStorage) GetAllTransitions() ([]model.Transition, error) {
-	return nil, nil
+	transitions := []model.Transition{}
+	err := p.db.Select(&transitions, "SELECT * FROM transitions")
+	if err != nil {
+		return []model.Transition{}, err
+	}
+	return transitions, nil
 }
 
 func (p *PostgresStorage) DeleteTransition(transitionID uuid.UUID) error {
-	return nil
+	_, err := p.db.Exec("DELETE FROM transitions WHERE id = $1", transitionID)
+	return err
 }
 
 func (p *PostgresStorage) DeleteTransitionTask(transitionID uuid.UUID, taskID uuid.UUID) error {
-	return nil
+	_, err := p.db.Exec("DELETE FROM transition_tasks WHERE id = $1", taskID)
+	return err
 }
 
 func (p *PostgresStorage) TASTransition(transition model.Transition, testVal model.Transition) (bool, error) {
-	return false, nil
+	tx, err := p.db.Beginx()
+	if err != nil {
+		return false, fmt.Errorf("could not begin TAS transaction: %w", err)
+	}
+	defer tx.Rollback()
+	var current model.Transition
+	err = tx.Get(&current, "SELECT * FROM transitions WHERE id = $1", transition.TransitionID)
+	if err != nil {
+		return false, fmt.Errorf("could retrieve TAS transition: %w", err)
+	}
+	// Location is not comparable. I'm unsure if we'd want to do a set equality check on it (AFAIK it is a set in
+	// practice). The etcd implementation _does not_ check all pages, so it de facto ignores Locations.
+	if cmp.Equal(testVal, current, cmpopts.IgnoreFields(model.Transition{}, "Location")) {
+		err = storeTransitionWithTx(tx, transition)
+		if err != nil {
+			return false, fmt.Errorf("could not replace TAS transition: %w", err)
+		}
+		if err = tx.Commit(); err != nil {
+			return false, fmt.Errorf("could not commit TAS transition: %w", err)
+		}
+	} else {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (p *PostgresStorage) Close() error {
