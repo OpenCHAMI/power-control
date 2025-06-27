@@ -15,8 +15,8 @@ import (
 // Application and schema versioning
 const (
 	APP_VERSION    = "1"
-	SCHEMA_VERSION = 2
-	SCHEMA_STEPS   = 2
+	SCHEMA_VERSION = 3
+	SCHEMA_STEPS   = 3
 )
 
 // schemaConfig holds the configuration for the Postgres schema initialization command
