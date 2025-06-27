@@ -300,7 +300,7 @@ services:
   power-control:
     build:
       context: .
-      dockerfile: Dockerfile.integration.Dockerfile
+      dockerfile: Dockerfile.ct.Dockerfile
     environment:
       - SMS_SERVER=http://smd:27779
       - CRAY_VAULT_AUTH_PATH=auth/token/create

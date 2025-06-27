@@ -94,21 +94,6 @@ func (e *ETCDLockProvider) Init(Logger *logrus.Logger) error {
 	return nil
 }
 
-func (d *ETCDLockProvider) InitFromStorage(m interface{}, Logger *logrus.Logger) {
-	ms := m.(*ETCDStorage)
-	d.Logger = ms.Logger
-	d.mutex = ms.mutex
-	d.kvHandle = ms.kvHandle
-	if Logger == nil {
-		d.Logger = ms.Logger
-	} else {
-		d.Logger = Logger
-	}
-	if d.Logger == nil {
-		d.Logger = logrus.New()
-	}
-}
-
 func (d *ETCDLockProvider) Ping() error {
 	e := toStorageETCD(d)
 	return e.Ping()

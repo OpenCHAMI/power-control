@@ -10,9 +10,13 @@ jobs:
       fail-fast: false
       matrix:
         storage:
+          # This is left as a stub. The tests run by the runUnitTest.sh docker-compose helper do not actually honor
+          # the STORAGE variable, though they can see it. https://github.com/OpenCHAMI/power-control/issues/25
+          # originally hoped to migrate all tests to a pluggable storage test harness, but this turned out to be much
+          # harder than expected.
           - MEMORY
-          - ETCD
-          - POSTGRES
+          #- ETCD
+          #- POSTGRES
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4

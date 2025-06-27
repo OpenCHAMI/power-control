@@ -1,3 +1,5 @@
+//go:build !integration_tests
+
 /*
  * (C) Copyright [2021-2023] Hewlett Packard Enterprise Development LP
  *
