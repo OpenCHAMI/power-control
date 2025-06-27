@@ -350,10 +350,6 @@ func (p *PostgresStorage) TASTransition(transition model.Transition, testVal mod
 	// Location is not comparable. I'm unsure if we'd want to do a set equality check on it (AFAIK it is a set in
 	// practice). The etcd implementation _does not_ check all pages, so it de facto ignores Locations.
 	if cmp.Equal(testVal, current, cmpopts.IgnoreFields(model.Transition{}, "Location")) {
-		_, err := tx.Exec("DELETE FROM transitions WHERE id = $1", transition.TransitionID)
-		if err != nil {
-			return false, fmt.Errorf("could not replace TAS transition: %w", err)
-		}
 		err = storeTransitionWithTx(tx, transition)
 		if err != nil {
 			return false, fmt.Errorf("could not replace TAS transition: %w", err)
