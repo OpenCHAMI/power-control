@@ -375,7 +375,7 @@ func updateComponentMap() error {
 				newComp.HSMData.PowerStatusURI = v.PowerStatusURI
 				newComp.HSMData.PowerActionURI = v.PowerActionURI
 				newComp.HSMData.PowerCapURI = v.PowerCapURI
-				newComp.PSComp.LastUpdated = time.Now().Format(time.RFC3339)
+				newComp.PSComp.LastUpdated = time.Now()
 				hwStateMap[v.BaseData.ID] = &newComp
 			}
 		default:
@@ -918,7 +918,7 @@ func updateHWState(xname string, hwState pcsmodel.PowerStateFilter,
 
 	comp.PSComp.PowerState = hwStateStr
 	comp.PSComp.ManagementState = mgmtStateStr
-	comp.PSComp.LastUpdated = time.Now().Format(time.RFC3339Nano)
+	comp.PSComp.LastUpdated = time.Now()
 	comp.PSComp.Error = errInfo
 
 	//Update stored map

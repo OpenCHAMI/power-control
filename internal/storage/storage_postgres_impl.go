@@ -149,9 +149,6 @@ func (p *PostgresStorage) GetPowerStatusMaster() (lastUpdated time.Time, err err
 		return time.Time{}, fmt.Errorf("failed to get power status master: %w", err)
 	}
 
-	// Convert to local time
-	lastUpdated = lastUpdated.Local()
-
 	return lastUpdated, nil
 }
 
@@ -224,12 +221,9 @@ func (p *PostgresStorage) StorePowerStatus(psc model.PowerStatusComponent) error
 
 	// Convert model.PowerStatusComponent to powerStatusComponentDB for database storage
 	var pscDB powerStatusComponentDB
-	err := pscDB.fromPowerStatusComponent(psc)
-	if err != nil {
-		return fmt.Errorf("failed to convert PowerStatusComponent to powerStatusComponentDB: %w", err)
-	}
+	pscDB.fromPowerStatusComponent(psc)
 
-	_, err = p.db.NamedExec(
+	_, err := p.db.NamedExec(
 		exec, pscDB,
 	)
 	if err != nil {
@@ -253,57 +247,25 @@ func (p *PostgresStorage) DeletePowerStatus(xname string) error {
 	return nil
 }
 
-// powerStatusComponentDB utility  struct to convert between model.PowerStatusComponent and database representation
+// Wrapper struct to override the SupportedPowerTransitions field in model.PowerStatusComponent
 type powerStatusComponentDB struct {
-	XName                     string         `db:"xname"`
-	PowerState                string         `db:"power_state"`
-	ManagementState           string         `db:"management_state"`
-	Error                     string         `db:"error"`
-	SupportedPowerTransitions pq.StringArray `db:"supported_power_transitions"`
-	LastUpdated               *time.Time     `db:"last_updated"`
+	model.PowerStatusComponent
+	// Override the field with type alias
+	SupportedPowerTransitions pq.StringArray `json:"supportedPowerTransitions" db:"supported_power_transitions"`
 }
 
 // toPowerStatusComponent converts a database representation (powerStatusComponentDB) to a model.PowerStatusComponent
 func (pscDB *powerStatusComponentDB) toPowerStatusComponent() model.PowerStatusComponent {
-	psc := model.PowerStatusComponent{
-		XName:                     pscDB.XName,
-		PowerState:                pscDB.PowerState,
-		ManagementState:           pscDB.ManagementState,
-		Error:                     pscDB.Error,
-		SupportedPowerTransitions: []string(pscDB.SupportedPowerTransitions),
-	}
-
-	if pscDB.LastUpdated != nil {
-		psc.LastUpdated = pscDB.LastUpdated.Local().Format(time.RFC3339Nano)
-	}
+	psc := pscDB.PowerStatusComponent
+	psc.SupportedPowerTransitions = []string(pscDB.SupportedPowerTransitions)
 
 	return psc
 }
 
 // fromPowerStatusComponent converts a model.PowerStatusComponent to a database representation (powerStatusComponentDB)
-func (pscDB *powerStatusComponentDB) fromPowerStatusComponent(psc model.PowerStatusComponent) error {
-	pscDB.XName = psc.XName
-	pscDB.PowerState = psc.PowerState
-	pscDB.ManagementState = psc.ManagementState
-	pscDB.Error = psc.Error
+func (pscDB *powerStatusComponentDB) fromPowerStatusComponent(psc model.PowerStatusComponent) {
+	pscDB.PowerStatusComponent = psc
 	pscDB.SupportedPowerTransitions = pq.StringArray(psc.SupportedPowerTransitions)
-
-	if psc.LastUpdated != "" {
-		// Parse the LastUpdated field, which can be in RFC3339Nano or RFC3339 format!
-		lastUpdated, err := time.Parse(time.RFC3339Nano, psc.LastUpdated)
-		if err != nil {
-			lastUpdated, err = time.Parse(time.RFC3339, psc.LastUpdated)
-			if err != nil {
-				return fmt.Errorf("invalid timestamp format: %w", err)
-			}
-		}
-
-		pscDB.LastUpdated = &lastUpdated
-	} else {
-		pscDB.LastUpdated = nil
-	}
-
-	return nil
 }
 
 func (p *PostgresStorage) GetPowerStatus(xname string) (psc model.PowerStatusComponent, err error) {

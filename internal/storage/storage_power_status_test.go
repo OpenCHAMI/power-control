@@ -22,7 +22,7 @@ func TestGetPowerStatusMaster(t *testing.T) {
 }
 
 func TestStorePowerStatusMaster(t *testing.T) {
-	now := time.Now()
+	now := time.Now().Truncate(time.Microsecond)
 
 	err := storageProvider.StorePowerStatusMaster(now)
 	require.NoError(t, err)
@@ -79,16 +79,15 @@ func TestStorePowerStatus(t *testing.T) {
 	require.Equal(t, ps.ManagementState, retrievedPS.ManagementState, "ManagementState should match")
 	require.Equal(t, ps.SupportedPowerTransitions, retrievedPS.SupportedPowerTransitions, "SupportedPowerTransitions should match")
 	require.Equal(t, ps.Error, retrievedPS.Error, "Error should match")
-	require.Empty(t, retrievedPS.LastUpdated, "LastUpdated should be empty")
 
 	// Now try with LastUpdated set
-	ps.LastUpdated = time.Now().Truncate(time.Microsecond).Format(time.RFC3339Nano)
+	ps.LastUpdated = time.Now().Truncate(time.Microsecond)
 	err = storageProvider.StorePowerStatus(ps)
 	require.NoError(t, err)
 
 	retrievedPS, err = storageProvider.GetPowerStatus(ps.XName)
 	require.NoError(t, err)
-	require.Equal(t, ps.LastUpdated, retrievedPS.LastUpdated, "LastUpdated should match")
+	require.True(t, ps.LastUpdated.Equal(retrievedPS.LastUpdated), "LastUpdated should match")
 }
 
 func TestDeletePowerStatus(t *testing.T) {
@@ -97,7 +96,7 @@ func TestDeletePowerStatus(t *testing.T) {
 		PowerState:                "on",
 		ManagementState:           "available",
 		SupportedPowerTransitions: []string{"On", "Off", "Reboot"},
-		LastUpdated:               time.Now().Truncate(time.Microsecond).Format(time.RFC3339Nano),
+		LastUpdated:               time.Now().Truncate(time.Microsecond),
 	}
 
 	err := storageProvider.StorePowerStatus(ps)
@@ -116,7 +115,7 @@ func TestGetPowerStatusAll(t *testing.T) {
 		PowerState:                "on",
 		ManagementState:           "available",
 		SupportedPowerTransitions: []string{"on", "off", "reboot"},
-		LastUpdated:               time.Now().Truncate(time.Microsecond).Format(time.RFC3339Nano),
+		LastUpdated:               time.Now(),
 	}
 
 	// Store multiple power status components with different XNames
@@ -152,7 +151,7 @@ func TestGetPowerStatusHierarchy(t *testing.T) {
 		PowerState:                "on",
 		ManagementState:           "available",
 		SupportedPowerTransitions: []string{"on", "off", "reboot"},
-		LastUpdated:               time.Now().Truncate(time.Microsecond).Format(time.RFC3339Nano),
+		LastUpdated:               time.Now().Truncate(time.Microsecond),
 	}
 
 	numberOfComponents := 5

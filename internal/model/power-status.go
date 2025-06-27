@@ -25,6 +25,7 @@ package model
 import (
 	"errors"
 	"strings"
+	"time"
 )
 
 // This pattern is from : https://yourbasic.org/golang/iota/
@@ -120,12 +121,12 @@ func (msf ManagementStateFilter) EnumIndex() int {
 }
 
 type PowerStatusComponent struct {
-	XName                     string   `json:"xname" db:"xname"`
-	PowerState                string   `json:"powerState" db:"power_state"`
-	ManagementState           string   `json:"managementState" db:"management_state"`
-	Error                     string   `json:"error" db:"error"`
-	SupportedPowerTransitions []string `json:"supportedPowerTransitions" db:"supported_power_transitions"`
-	LastUpdated               string   `json:"lastUpdated" db:"last_updated"` //RFC3339Nano
+	XName                     string    `json:"xname" db:"xname"`
+	PowerState                string    `json:"powerState" db:"power_state"`
+	ManagementState           string    `json:"managementState" db:"management_state"`
+	Error                     string    `json:"error" db:"error"`
+	SupportedPowerTransitions []string  `json:"supportedPowerTransitions" db:"supported_power_transitions"`
+	LastUpdated               time.Time `json:"lastUpdated" db:"last_updated"`
 }
 
 type PowerStatus struct {
