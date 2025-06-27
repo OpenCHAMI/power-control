@@ -139,9 +139,10 @@ func (p *PostgresStorage) GetPowerStatusMaster() (lastUpdated time.Time, err err
 	err = p.db.Get(&lastUpdated, exec)
 
 	if err != nil {
-		// If the error is sql.ErrNoRows, it means not power status master exists, we have to return a specific error message!
-		// This is a workaround for the fact that the ETCD implementation returns a specific error message when the power status
-		// master does not exist. This should be reworked in the future!
+		// If the error is sql.ErrNoRows, no power status master exists.
+		// domain:getPowerStatusMaster() relies on the storage engine errors containing
+		// "power status master does not exist" for part of its control flow.
+		// We should consider indicating this condition explicitly in the interface function signature instead.
 		if errors.Is(err, sql.ErrNoRows) {
 			return time.Time{}, errors.New("power status master does not exist")
 		}
