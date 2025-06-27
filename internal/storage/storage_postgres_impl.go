@@ -216,8 +216,16 @@ func (p *PostgresStorage) StoreTransition(transition model.Transition) error {
 // storeTransitionWithTx is a helper that upserts a Transition and its Locations within a given transaction. The caller
 // is responsible for committing or rolling back the transaction.
 func storeTransitionWithTx(tx *sqlx.Tx, transition model.Transition) error {
-	exec := `INSERT INTO transitions (id, operation, deadline, created, active, expires, location, status)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	exec := `INSERT INTO transitions (
+		id,
+		operation,
+		deadline,
+		created,
+		active,
+		expires,
+		location,
+		status
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	ON CONFLICT (id) DO UPDATE SET active = excluded.active, status = excluded.status`
 	_, err := tx.Exec(
 		exec,
@@ -237,8 +245,18 @@ func storeTransitionWithTx(tx *sqlx.Tx, transition model.Transition) error {
 }
 
 func (p *PostgresStorage) StoreTransitionTask(op model.TransitionTask) error {
-	exec := `INSERT INTO transition_tasks (id, transition_id, operation, state, xname, reservation_key, deputy_key, status, status_desc, error)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	exec := `INSERT INTO transition_tasks (
+		id,
+		transition_id,
+		operation,
+		state,
+		xname,
+		reservation_key,
+		deputy_key,
+		status,
+		status_desc,
+		error
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	ON CONFLICT (id) DO UPDATE SET state = excluded.state, status = excluded.status, status_desc = excluded.status_desc, error = excluded.error`
 	_, err := p.db.Exec(
 		exec,
