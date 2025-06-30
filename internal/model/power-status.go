@@ -23,6 +23,7 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -127,6 +128,29 @@ type PowerStatusComponent struct {
 	Error                     string    `json:"error" db:"error"`
 	SupportedPowerTransitions []string  `json:"supportedPowerTransitions" db:"supported_power_transitions"`
 	LastUpdated               time.Time `json:"lastUpdated" db:"last_updated"`
+}
+
+// UnmarshalJSON is a custom marshaller for PowerStatusComponent to ensure
+// that that LastUpdated is "" if its not been set.
+func (p PowerStatusComponent) MarshalJSON() ([]byte, error) {
+	type PowerStatusComponentOrginal PowerStatusComponent
+
+	// This is the default value for LastUpdated if its not set, for example
+	// when the status of a component is requested for a component that does not
+	// have power status, such as a node enclosure. It probably makes more sense
+	// for it to be null, but that would technically require a change to the API.
+	lastUpdated := ""
+	if !p.LastUpdated.IsZero() {
+		lastUpdated = p.LastUpdated.Format(time.RFC3339Nano)
+	}
+
+	return json.Marshal(&struct {
+		*PowerStatusComponentOrginal
+		LastUpdated string `json:"lastUpdated"`
+	}{
+		PowerStatusComponentOrginal: (*PowerStatusComponentOrginal)(&p),
+		LastUpdated:                 lastUpdated,
+	})
 }
 
 type PowerStatus struct {
