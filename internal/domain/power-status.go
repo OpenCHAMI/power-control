@@ -536,6 +536,10 @@ func getHWStatesFromHW() error {
 				glogger.Warnf("%s: Missing FQDN or power status URI for %s", fname, k)
 				taskList[taskIX].Ignore = true
 				taskIX++
+				// PDU JAWS Device, handled in own monitoring loop
+			} else if strings.Contains(v.HSMData.PowerStatusURI, "/jaws") {
+				taskList[taskIX].Ignore = true
+				taskIX++
 			} else {
 				url = "https://" + v.HSMData.RfFQDN + v.HSMData.PowerStatusURI
 				taskList[taskIX].Request, _ = http.NewRequest(http.MethodGet, url, nil)
