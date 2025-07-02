@@ -493,6 +493,35 @@ func main() {
 		logger.Log, (time.Duration(pwrSampleInterval) * time.Second),
 		statusTimeout, statusHttpRetries, maxIdleConns, maxIdleConnsPerHost)
 
+	// Start up Monitoring of JAWS PDU devices
+	jawsMonitor := false
+	envstr = os.Getenv("PCS_JAWS_MONITOR")
+	if envstr != "" {
+		yn, _ := strconv.ParseBool(envstr)
+		if yn == true {
+			logger.Log.Infof("Monitoring JAWS devices.")
+			jawsMonitor = true
+		}
+	} else {
+		logger.Log.Infof("JAWS Monitoring set to False")
+	}
+
+	if jawsMonitor {
+		jawsMonitorInterval := 30
+		envstr = os.Getenv("PCS_JAWS_MONITOR_INTERVAL")
+		if envstr != "" {
+			jmi, err := strconv.Atoi(envstr)
+			if err != nil {
+				logger.Log.Errorf("Invalid value of PCS_JAWS_MONITOR_INTERVAL, defaulting to %d",
+					jawsMonitorInterval)
+			} else {
+				logger.Log.Infof("Using PCS_JAWS_MONITOR_INTERVAL: %v", jmi)
+				jawsMonitorInterval = jmi
+			}
+		}
+		go domain.JawsMonitor(jawsMonitorInterval)
+	}
+
 	domain.StartRecordsReaper()
 
 	///////////////////////////////
