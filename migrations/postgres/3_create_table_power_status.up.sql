@@ -27,8 +27,6 @@ CREATE TABLE IF NOT EXISTS power_status_component (
 	"management_state" VARCHAR(255) NOT NULL,
 	"error" TEXT,
 	"supported_power_transitions" VARCHAR(255)[],
-	-- last_updated in the interface is a string, but we use TIMESTAMPTZ as it
-	-- is a timestamp.
 	"last_updated" TIMESTAMPTZ,
 	PRIMARY KEY ("xname")
 );
