@@ -797,6 +797,7 @@ func (ts *Transitions_TS) TestGetPowerSupplies() {
 		XName:           connectorXname1,
 		PowerState:      model.PowerStateFilter_On.String(),
 		ManagementState: model.ManagementStateFilter_available.String(),
+		LastUpdated:     time.Now(),
 	}
 	(*GLOB.DSP).StorePowerStatus(connectorPowerStatus)
 
@@ -831,6 +832,7 @@ func (ts *Transitions_TS) TestGetPowerSupplies() {
 		XName:           connectorXname2,
 		PowerState:      model.PowerStateFilter_Off.String(),
 		ManagementState: model.ManagementStateFilter_available.String(),
+		LastUpdated:     time.Now(),
 	}
 	(*GLOB.DSP).StorePowerStatus(connectorPowerStatus)
 

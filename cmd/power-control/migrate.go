@@ -12,6 +12,13 @@ import (
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
 )
 
+// Application and schema versioning
+const (
+	APP_VERSION    = "1"
+	SCHEMA_VERSION = 3
+	SCHEMA_STEPS   = 3
+)
+
 // schemaConfig holds the configuration for the Postgres schema initialization command
 type schemaConfig struct {
 	step         uint

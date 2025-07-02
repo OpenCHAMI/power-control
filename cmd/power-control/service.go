@@ -47,13 +47,6 @@ const (
 	dfltMaxHTTPBackoff = 8
 )
 
-// Application and schema versioning
-const (
-	APP_VERSION    = "1"
-	SCHEMA_VERSION = 1
-	SCHEMA_STEPS   = 1
-)
-
 var (
 	Running                          = true
 	restSrv             *http.Server = nil

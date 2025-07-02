@@ -2,14 +2,16 @@ package storage
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/Cray-HPE/hms-xname/xnametypes"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	pq "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 
 	"github.com/OpenCHAMI/power-control/v2/internal/model"
@@ -126,39 +128,210 @@ func (p *PostgresStorage) Init(logger *logrus.Logger) error {
 }
 
 func (p *PostgresStorage) Ping() error {
+	if p.db == nil {
+		return fmt.Errorf("instance closed or not initialized")
+	}
+
+	if err := p.db.Ping(); err != nil {
+		return fmt.Errorf("ping failed: %v", err)
+	}
+
 	return nil
 }
 
-func (p *PostgresStorage) GetPowerStatusMaster() (time.Time, error) {
-	return time.Time{}, nil
+func (p *PostgresStorage) GetPowerStatusMaster() (lastUpdated time.Time, err error) {
+	exec := `SELECT last_updated FROM power_status_master`
+	err = p.db.Get(&lastUpdated, exec)
+
+	if err != nil {
+		// If the error is sql.ErrNoRows, no power status master exists.
+		// domain:getPowerStatusMaster() relies on the storage engine errors containing
+		// "power status master does not exist" for part of its control flow.
+		// We should consider indicating this condition explicitly in the interface function signature instead.
+		if errors.Is(err, sql.ErrNoRows) {
+			return time.Time{}, errors.New("power status master does not exist")
+		}
+
+		return time.Time{}, fmt.Errorf("failed to get power status master: %w", err)
+	}
+
+	return lastUpdated, nil
 }
 
 func (p *PostgresStorage) StorePowerStatusMaster(now time.Time) error {
+	exec := `
+		INSERT INTO power_status_master (last_updated)
+		VALUES ($1)
+		ON CONFLICT (singleton) DO UPDATE SET
+			last_updated = EXCLUDED.last_updated
+	`
+	_, err := p.db.Exec(exec, now)
+	if err != nil {
+		return fmt.Errorf("failed to store power status master timestamp: %w", err)
+	}
+
 	return nil
 }
 
 func (p *PostgresStorage) TASPowerStatusMaster(now time.Time, testVal time.Time) (bool, error) {
-	return false, nil
+	exec := `
+		INSERT INTO power_status_master (last_updated)
+		VALUES ($1)
+		ON CONFLICT (singleton) DO UPDATE SET
+			last_updated = EXCLUDED.last_updated
+		WHERE power_status_master.last_updated = $2
+	`
+
+	result, err := p.db.Exec(exec, now, testVal)
+	if err != nil {
+		return false, fmt.Errorf("failed to store power status master timestamp: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return rowsAffected > 0, nil
 }
 
 func (p *PostgresStorage) StorePowerStatus(psc model.PowerStatusComponent) error {
+	if !(xnametypes.IsHMSCompIDValid(psc.XName)) {
+		return fmt.Errorf("invalid xname: %s", psc.XName)
+	}
+
+	exec := `
+		INSERT INTO power_status_component (
+			xname, 
+			power_state, 
+			management_state, 
+			error, 
+			supported_power_transitions, 
+			last_updated
+		)
+		VALUES (
+			:xname, 
+			:power_state, 
+			:management_state, 
+			:error, 
+			:supported_power_transitions, 
+			:last_updated
+		)
+		ON CONFLICT (xname) DO UPDATE SET 
+			power_state = excluded.power_state,
+			management_state = excluded.management_state,
+			error = excluded.error,
+			supported_power_transitions = excluded.supported_power_transitions,
+			last_updated = excluded.last_updated
+	`
+
+	// Convert model.PowerStatusComponent to powerStatusComponentDB for database storage
+	var pscDB powerStatusComponentDB
+	pscDB.fromPowerStatusComponent(psc)
+
+	_, err := p.db.NamedExec(
+		exec, pscDB,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to store power status component for '%s': %w", psc.XName, err)
+	}
+
 	return nil
 }
 
 func (p *PostgresStorage) DeletePowerStatus(xname string) error {
+	if !(xnametypes.IsHMSCompIDValid(xname)) {
+		return fmt.Errorf("invalid xname: %s", xname)
+	}
+
+	exec := `DELETE FROM power_status_component WHERE xname = $1`
+	_, err := p.db.Exec(exec, xname)
+	if err != nil {
+		return fmt.Errorf("failed to delete power status component for '%s': %w", xname, err)
+	}
+
 	return nil
 }
 
-func (p *PostgresStorage) GetPowerStatus(xname string) (model.PowerStatusComponent, error) {
-	return model.PowerStatusComponent{}, nil
+// Wrapper struct to override the SupportedPowerTransitions field in model.PowerStatusComponent
+type powerStatusComponentDB struct {
+	model.PowerStatusComponent
+	// Override the field with type alias
+	SupportedPowerTransitions pq.StringArray `json:"supportedPowerTransitions" db:"supported_power_transitions"`
 }
 
-func (p *PostgresStorage) GetAllPowerStatus() (model.PowerStatus, error) {
-	return model.PowerStatus{}, nil
+// toPowerStatusComponent converts a database representation (powerStatusComponentDB) to a model.PowerStatusComponent
+func (pscDB *powerStatusComponentDB) toPowerStatusComponent() model.PowerStatusComponent {
+	psc := pscDB.PowerStatusComponent
+	psc.SupportedPowerTransitions = []string(pscDB.SupportedPowerTransitions)
+
+	return psc
 }
 
-func (p *PostgresStorage) GetPowerStatusHierarchy(xname string) (model.PowerStatus, error) {
-	return model.PowerStatus{}, nil
+// fromPowerStatusComponent converts a model.PowerStatusComponent to a database representation (powerStatusComponentDB)
+func (pscDB *powerStatusComponentDB) fromPowerStatusComponent(psc model.PowerStatusComponent) {
+	pscDB.PowerStatusComponent = psc
+	pscDB.SupportedPowerTransitions = pq.StringArray(psc.SupportedPowerTransitions)
+}
+
+func (p *PostgresStorage) GetPowerStatus(xname string) (psc model.PowerStatusComponent, err error) {
+	if !(xnametypes.IsHMSCompIDValid(xname)) {
+		return psc, fmt.Errorf("invalid xname: %s", xname)
+	}
+
+	var pscDB powerStatusComponentDB
+
+	err = p.db.Get(&pscDB, "SELECT * FROM power_status_component WHERE xname = $1", xname)
+	if err != nil {
+
+		return model.PowerStatusComponent{}, err
+	}
+
+	// Convert to model struct
+	psc = pscDB.toPowerStatusComponent()
+
+	return psc, nil
+}
+
+// toPowerStatusComponents converts a slice of powerStatusComponentDB to a slice of model.PowerStatusComponent
+func toPowerStatusComponents(pscDBs []powerStatusComponentDB) []model.PowerStatusComponent {
+	psc := make([]model.PowerStatusComponent, len(pscDBs))
+	for i, pscDB := range pscDBs {
+		psc[i] = pscDB.toPowerStatusComponent()
+	}
+
+	return psc
+}
+
+func (p *PostgresStorage) GetAllPowerStatus() (ps model.PowerStatus, err error) {
+	status := []powerStatusComponentDB{}
+
+	err = p.db.Select(&status, "SELECT * FROM power_status_component")
+	if err != nil {
+		return model.PowerStatus{}, fmt.Errorf("failed to get all power status components: %w", err)
+	}
+
+	// Convert the slice of powerStatusComponentDB to model.PowerStatus
+	ps.Status = toPowerStatusComponents(status)
+
+	return ps, nil
+}
+
+func (p *PostgresStorage) GetPowerStatusHierarchy(xname string) (ps model.PowerStatus, err error) {
+	if !(xnametypes.IsHMSCompIDValid(xname)) {
+		return ps, fmt.Errorf("invalid xname: %s", xname)
+	}
+
+	status := []powerStatusComponentDB{}
+	err = p.db.Select(&status, "SELECT * FROM power_status_component WHERE xname LIKE $1 || '%'", xname)
+	if err != nil {
+		return model.PowerStatus{}, fmt.Errorf("failed to get power status hierarchy for '%s': %w", xname, err)
+	}
+
+	// Convert the slice of powerStatusComponentDB to model.PowerStatusstatus
+	ps.Status = toPowerStatusComponents(status)
+
+	return ps, nil
 }
 
 func (p *PostgresStorage) StorePowerCapTask(task model.PowerCapTask) error {
