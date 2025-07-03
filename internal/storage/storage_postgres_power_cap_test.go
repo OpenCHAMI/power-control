@@ -198,7 +198,7 @@ func (s *StorageTestSuite) TestPowerCapOperationDelete() {
 	s.Require().ErrorContains(err, "could not retrieve power cap operation")
 }
 
-// TestPowerCapMultiple tests inserting and retrieving multiple associated resources.
+// TestPowerCapMultiple tests inserting, retrieving, and deleting multiple associated resources.
 func (s *StorageTestSuite) TestPowerCapMultiple() {
 	paramsA := model.PowerCapSnapshotParameter{
 		Xnames: []string{"x0c0s0b0n0", "x0c0s1b0n0"},
@@ -243,4 +243,11 @@ func (s *StorageTestSuite) TestPowerCapMultiple() {
 	s.Require().Contains([]string{opsB[0].Type, opsB[1].Type, opsB[2].Type}, "xray")
 	s.Require().Contains([]string{opsB[0].Type, opsB[1].Type, opsB[2].Type}, "yankee")
 	s.Require().Contains([]string{opsB[0].Type, opsB[1].Type, opsB[2].Type}, "zulu")
+
+	err = s.sp.DeletePowerCapTask(taskA.TaskID)
+	s.Require().NoError(err)
+
+	// the task delete should cascade delete all its operations; this op should no longer exist
+	_, err = s.sp.GetPowerCapOperation(taskA.TaskID, opA1.OperationID)
+	s.Require().ErrorContains(err, "could not retrieve power cap operation")
 }
