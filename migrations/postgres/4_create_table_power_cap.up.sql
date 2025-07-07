@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS power_cap_tasks (
 	"id" UUID PRIMARY KEY,
 	"type" VARCHAR(255) NOT NULL,
 	"created" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"expires" TIMESTAMPTZ,
+	"expires" TIMESTAMPTZ NOT NULL,
 	"status" VARCHAR(255) NOT NULL,
 	"snapshot_parameters" JSON, -- just an array of xnames, but it being embedded in a struct means we can't serialize to array directly
 	"patch_parameters" JSON,
