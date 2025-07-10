@@ -1,0 +1,313 @@
+---
+# Source: ochami-power-control/templates/configmaps.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ochami-power-control-cacert-info
+data:
+  CA_URI: ""
+---
+# Source: ochami-power-control/charts/cray-service/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ochami-power-control
+  labels:
+    app.kubernetes.io/name: ochami-power-control
+    helm.sh/base-chart: cray-service-12.0.0
+    helm.sh/chart: unknown-chart-name-unknown-chart-version
+    app.kubernetes.io/instance: riptide
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    cray.io/service: ochami-power-control
+    
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      name: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: ochami-power-control
+    app.kubernetes.io/instance: riptide
+---
+# Source: ochami-power-control/charts/cray-service/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ochami-power-control
+  labels:
+    app.kubernetes.io/name: ochami-power-control
+    helm.sh/base-chart: cray-service-12.0.0
+    helm.sh/chart: unknown-chart-name-unknown-chart-version
+    app.kubernetes.io/instance: riptide
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    cray.io/service: ochami-power-control
+    
+spec:
+  replicas: 3
+  strategy:
+    
+    rollingUpdate:
+      maxUnavailable: 50%
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ochami-power-control
+      app.kubernetes.io/instance: riptide
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ochami-power-control
+        app.kubernetes.io/instance: riptide
+        
+      annotations:
+        service.cray.io/public: "true"
+        traffic.sidecar.istio.io/excludeOutboundPorts: 2379,2380
+    spec:
+      
+      serviceAccountName: "jobs-watcher"
+      initContainers:
+      - name: "ochami-power-control-wait-for-etcd"
+        image: artifactory.algol60.net/csm-docker/stable/docker-kubectl:1.24.17
+        imagePullPolicy: IfNotPresent
+        command:
+          - /bin/sh
+          - -c
+          - |
+            while true; do
+              JOB_CONDITION="$(kubectl get jobs -n services -l app.kubernetes.io/name=ochami-power-control-wait-for-etcd -o jsonpath='{.items[0].status.conditions[0].type}')"
+              JOB_CONDITION_RC=$?
+              if [ $JOB_CONDITION_RC -eq 0 ]; then
+                if [ "$JOB_CONDITION" == 'Complete' -o "$JOB_CONDITION" == 'SuccessCriteriaMet' ]; then
+                  echo "Completed"
+                  break
+                fi
+                echo "Waiting for the ochami-power-control-wait-for-etcd job in the services namespace to complete, current condition is $(kubectl get jobs -n services -l app.kubernetes.io/name=ochami-power-control-wait-for-etcd -o jsonpath='{.items[0].status}')"
+                sleep 3
+              elif [ $JOB_CONDITION_RC -ne 1 ]; then
+                echo "'kubectl get jobs' failed with exit code $JOB_CONDITION_RC , failing"
+                exit 1
+              else
+                echo "'kubectl get jobs' failed with exit code $JOB_CONDITION_RC , will retry"
+                sleep 3
+              fi
+            done
+        resources:
+          requests:
+            cpu: 30m
+            memory: "20Mi"
+          limits:
+            cpu: 500m
+            memory: "100Mi"
+      containers:
+      - name: ochami-power-control
+        image: artifactory.algol60.net/csm-docker/stable/ochami-power-control:2.13.0
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: ETCD_HOST
+            value: "ochami-power-control-bitnami-etcd"
+          - name: ETCD_PORT
+            value: "2379"
+          - name: LOG_LEVEL
+            value: INFO
+          - name: SMS_SERVER
+            value: http://cray-smd
+          - name: VAULT_ENABLED
+            value: "true"
+          - name: VAULT_ADDR
+            value: http://cray-vault.vault:8200
+          - name: VAULT_SKIP_VERIFY
+            value: "true"
+          - name: TRS_IMPLEMENTATION
+            value: LOCAL
+          - name: SERVICE_RESERVATION_VERBOSITY
+            value: ERROR
+          - name: HSMLOCK_ENABLED
+            value: "true"
+          - name: STORAGE
+            value: ETCD
+          - name: PCS_CA_URI
+            valueFrom:
+              configMapKeyRef:
+                key: CA_URI
+                name: ochami-power-control-cacert-info
+          - name: MAX_NUM_COMPLETED
+            value: "20000"
+          - name: EXPIRE_TIME_MINS
+            value: "1440"
+          - name: PCS_BASE_TRS_TASK_TIMEOUT
+            value: "40"
+          - name: PCS_STATUS_TIMEOUT
+            value: "30"
+          - name: PCS_STATUS_HTTP_RETRIES
+            value: "3"
+          - name: PCS_MAX_IDLE_CONNS
+            value: "4000"
+          - name: PCS_MAX_IDLE_CONNS_PER_HOST
+            value: "4"
+          - name: ETCD_DISABLE_SIZE_CHECKS
+            value: "false"
+          - name: ETCD_PAGE_SIZE
+            value: "5000"
+          - name: ETCD_MAX_OBJECT_SIZE
+            value: "1570000"
+          - name: MAX_TRANSITION_MESSAGE_LENGTH
+            value: "130"
+        ports:
+          - containerPort: 28007
+            name: http
+        livenessProbe:
+          httpGet:
+            path: /v1/liveness
+            port: 28007
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /v1/readiness
+            port: 28007
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 25
+        volumeMounts:
+          - mountPath: /usr/local/cray-pki
+            name: cray-pki-cacert-vol
+        resources:
+          limits:
+            cpu: "4"
+            memory: 4Gi
+          requests:
+            cpu: 500m
+            memory: 256Mi
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          runAsNonRoot: true
+      
+      
+      
+      
+      volumes:
+        - configMap:
+            name: cray-configmap-ca-public-key
+          name: cray-pki-cacert-vol
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - ochami-power-control
+            topologyKey: kubernetes.io/hostname
+---
+# Source: ochami-power-control/charts/cray-service/templates/ingress.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: "ochami-power-control"
+  labels:
+    app.kubernetes.io/name: ochami-power-control
+    helm.sh/base-chart: cray-service-12.0.0
+    helm.sh/chart: unknown-chart-name-unknown-chart-version
+    app.kubernetes.io/instance: riptide
+    app.kubernetes.io/managed-by: Helm
+    
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - services-gateway
+    - customer-admin-gateway
+  http:
+    - match:
+        - uri:
+            prefix: "/apis/power-control/v1/"
+      rewrite:
+        uri: "/v1/"
+      route:
+        - destination:
+            host: "ochami-power-control"
+            port:
+              number: 80
+---
+# Source: ochami-power-control/templates/tests/test-functional.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "riptide-test-functional"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "1" #run this after smoke!
+
+  labels:
+    app.kubernetes.io/name: "riptide-test-functional"
+
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      name: "riptide-test-functional"
+      annotations:
+        "proxy.istio.io/config": '{ "holdApplicationUntilProxyStarts": true }'
+      labels:
+        app.kubernetes.io/managed-by:  "ochami-power-control"
+        app.kubernetes.io/instance:  "riptide-test-functional"
+        helm.sh/chart: "ochami-power-control-2.2.5"
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: "functional"
+          image: "artifactory.algol60.net/csm-docker/stable/ochami-power-control-hmth-test:2.13.0"
+          imagePullPolicy: "IfNotPresent"
+          command: ["/bin/sh", "-c"]
+          args: ["entrypoint.sh tavern -c /src/app/tavern_global_config_ct_test_production.yaml -p /src/app/api/1-non-disruptive"]
+---
+# Source: ochami-power-control/templates/tests/test-smoke.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "riptide-test-smoke"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "-1" #run this first!
+
+  labels:
+    app.kubernetes.io/name: "riptide-test-smoke"
+
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      name: "riptide-test-smoke"
+      annotations:
+        "proxy.istio.io/config": '{ "holdApplicationUntilProxyStarts": true }'
+      labels:
+        app.kubernetes.io/managed-by:  "ochami-power-control"
+        app.kubernetes.io/instance:  "riptide-test-smoke"
+        helm.sh/chart: "ochami-power-control-2.2.5"
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: "smoke"
+          image: "artifactory.algol60.net/csm-docker/stable/ochami-power-control-hmth-test:2.13.0"
+          imagePullPolicy: "IfNotPresent"
+          command: ["/bin/sh", "-c"]
+          args: ["entrypoint.sh smoke -f smoke.json -u http://ochami-power-control"]
