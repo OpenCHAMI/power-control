@@ -1,0 +1,31 @@
+---
+# Source: ochami-power-control/charts/cray-service/templates/ingress.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: "ochami-power-control"
+  labels:
+    app.kubernetes.io/name: ochami-power-control
+    helm.sh/base-chart: cray-service-12.0.0
+    helm.sh/chart: unknown-chart-name-unknown-chart-version
+    app.kubernetes.io/instance: riptide
+    app.kubernetes.io/managed-by: Helm
+    
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - services-gateway
+    - customer-admin-gateway
+  http:
+    - match:
+        - uri:
+            prefix: "/apis/power-control/v1/"
+      rewrite:
+        uri: "/v1/"
+      route:
+        - destination:
+            host: "ochami-power-control"
+            port:
+              number: 80
+

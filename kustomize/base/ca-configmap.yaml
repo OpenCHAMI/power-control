@@ -1,0 +1,9 @@
+---
+# Source: ochami-power-control/templates/configmaps.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ochami-power-control-cacert-info
+data:
+  CA_URI: ""
+

@@ -1,0 +1,27 @@
+---
+# Source: ochami-power-control/charts/cray-service/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ochami-power-control
+  labels:
+    app.kubernetes.io/name: ochami-power-control
+    helm.sh/base-chart: cray-service-12.0.0
+    helm.sh/chart: unknown-chart-name-unknown-chart-version
+    app.kubernetes.io/instance: riptide
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    cray.io/service: ochami-power-control
+    
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      name: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: ochami-power-control
+    app.kubernetes.io/instance: riptide
+

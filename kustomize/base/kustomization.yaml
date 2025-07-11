@@ -3,7 +3,10 @@ kind: Kustomization
 namespace: ochami
 
 resources:
-- base.yaml
+- deployment.yaml
+- service.yaml
+- istio-virtualservice.yaml
+- ca-configmap.yaml
 
 labels:
 - includeSelectors: true
