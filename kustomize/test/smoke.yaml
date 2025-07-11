@@ -1,17 +1,11 @@
 ---
-# Source: ochami-power-control/templates/tests/test-smoke.yaml
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: "riptide-test-smoke"
   annotations:
-    "helm.sh/hook": test
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-    "helm.sh/hook-weight": "-1" #run this first!
-
   labels:
     app.kubernetes.io/name: "riptide-test-smoke"
-
 spec:
   backoffLimit: 0
   template:
@@ -22,7 +16,6 @@ spec:
       labels:
         app.kubernetes.io/managed-by:  "ochami-power-control"
         app.kubernetes.io/instance:  "riptide-test-smoke"
-        helm.sh/chart: "ochami-power-control-2.2.5"
     spec:
       restartPolicy: Never
       securityContext:

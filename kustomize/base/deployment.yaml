@@ -1,23 +1,16 @@
 ---
-# Source: ochami-power-control/charts/cray-service/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ochami-power-control
   labels:
     app.kubernetes.io/name: ochami-power-control
-    helm.sh/base-chart: cray-service-12.0.0
-    helm.sh/chart: unknown-chart-name-unknown-chart-version
     app.kubernetes.io/instance: riptide
-    app.kubernetes.io/managed-by: Helm
-    
   annotations:
     cray.io/service: ochami-power-control
-    
 spec:
   replicas: 3
   strategy:
-    
     rollingUpdate:
       maxUnavailable: 50%
     type: RollingUpdate
@@ -30,12 +23,10 @@ spec:
       labels:
         app.kubernetes.io/name: ochami-power-control
         app.kubernetes.io/instance: riptide
-        
       annotations:
         service.cray.io/public: "true"
         traffic.sidecar.istio.io/excludeOutboundPorts: 2379,2380
     spec:
-      
       serviceAccountName: "jobs-watcher"
       initContainers:
       - name: "ochami-power-control-wait-for-etcd"
@@ -152,10 +143,6 @@ spec:
           runAsUser: 65534
           runAsGroup: 65534
           runAsNonRoot: true
-      
-      
-      
-      
       volumes:
         - configMap:
             name: cray-configmap-ca-public-key
@@ -170,4 +157,3 @@ spec:
                 values:
                 - ochami-power-control
             topologyKey: kubernetes.io/hostname
-

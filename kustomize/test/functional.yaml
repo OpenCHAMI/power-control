@@ -1,17 +1,11 @@
 ---
-# Source: ochami-power-control/templates/tests/test-functional.yaml
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: "riptide-test-functional"
   annotations:
-    "helm.sh/hook": test
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-    "helm.sh/hook-weight": "1" #run this after smoke!
-
   labels:
     app.kubernetes.io/name: "riptide-test-functional"
-
 spec:
   backoffLimit: 0
   template:
@@ -22,7 +16,6 @@ spec:
       labels:
         app.kubernetes.io/managed-by:  "ochami-power-control"
         app.kubernetes.io/instance:  "riptide-test-functional"
-        helm.sh/chart: "ochami-power-control-2.2.5"
     spec:
       restartPolicy: Never
       securityContext:
