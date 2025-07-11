@@ -10,5 +10,8 @@ resources:
 labels:
 - includeSelectors: true
   pairs:
-    app: power-control
-    org: openchami
+    app.kubernetes.io/name: ochami-power-control
+- includeSelectors: false
+  pairs:
+    app.kubernetes.io/version: v2.7.0
+    app.kubernetes.io/part-of: openchami

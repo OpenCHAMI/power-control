@@ -4,10 +4,7 @@ kind: Deployment
 metadata:
   name: ochami-power-control
   labels:
-    app.kubernetes.io/name: ochami-power-control
-    app.kubernetes.io/instance: riptide
-  annotations:
-    cray.io/service: ochami-power-control
+    app.kubernetes.io/component: power-service
 spec:
   replicas: 3
   strategy:
@@ -16,15 +13,12 @@ spec:
     type: RollingUpdate
   selector:
     matchLabels:
-      app.kubernetes.io/name: ochami-power-control
-      app.kubernetes.io/instance: riptide
+      app.kubernetes.io/component: power-service
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ochami-power-control
-        app.kubernetes.io/instance: riptide
+        app.kubernetes.io/component: power-service
       annotations:
-        service.cray.io/public: "true"
         traffic.sidecar.istio.io/excludeOutboundPorts: 2379,2380
     spec:
       serviceAccountName: "jobs-watcher"

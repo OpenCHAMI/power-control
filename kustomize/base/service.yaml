@@ -4,10 +4,7 @@ kind: Service
 metadata:
   name: ochami-power-control
   labels:
-    app.kubernetes.io/name: ochami-power-control
-    app.kubernetes.io/instance: riptide
-  annotations:
-    cray.io/service: ochami-power-control
+    app.kubernetes.io/component: power-service
 spec:
   type: ClusterIP
   ports:
@@ -15,6 +12,3 @@ spec:
       targetPort: http
       name: http
       protocol: TCP
-  selector:
-    app.kubernetes.io/name: ochami-power-control
-    app.kubernetes.io/instance: riptide

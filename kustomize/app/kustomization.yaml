@@ -4,3 +4,8 @@ namespace: ochami
 
 resources:
 - ../base
+
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/instance: default-power-control

@@ -4,8 +4,7 @@ kind: VirtualService
 metadata:
   name: "ochami-power-control"
   labels:
-    app.kubernetes.io/name: ochami-power-control
-    app.kubernetes.io/instance: riptide
+    app.kubernetes.io/component: power-service
 spec:
   hosts:
     - "*"
