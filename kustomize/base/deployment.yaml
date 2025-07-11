@@ -98,10 +98,7 @@ spec:
           - name: STORAGE
             value: ETCD
           - name: PCS_CA_URI
-            valueFrom:
-              configMapKeyRef:
-                key: CA_URI
-                name: ochami-power-control-cacert-info
+            value: ""
           - name: MAX_NUM_COMPLETED
             value: "20000"
           - name: EXPIRE_TIME_MINS
