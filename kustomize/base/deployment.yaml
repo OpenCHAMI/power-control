@@ -22,48 +22,11 @@ spec:
         traffic.sidecar.istio.io/excludeOutboundPorts: 2379,2380
     spec:
       serviceAccountName: "jobs-watcher"
-      initContainers:
-      - name: "ochami-power-control-wait-for-etcd"
-        image: artifactory.algol60.net/csm-docker/stable/docker-kubectl:1.24.17
-        imagePullPolicy: IfNotPresent
-        command:
-          - /bin/sh
-          - -c
-          - |
-            while true; do
-              JOB_CONDITION="$(kubectl get jobs -n services -l app.kubernetes.io/name=ochami-power-control-wait-for-etcd -o jsonpath='{.items[0].status.conditions[0].type}')"
-              JOB_CONDITION_RC=$?
-              if [ $JOB_CONDITION_RC -eq 0 ]; then
-                if [ "$JOB_CONDITION" == 'Complete' -o "$JOB_CONDITION" == 'SuccessCriteriaMet' ]; then
-                  echo "Completed"
-                  break
-                fi
-                echo "Waiting for the ochami-power-control-wait-for-etcd job in the services namespace to complete, current condition is $(kubectl get jobs -n services -l app.kubernetes.io/name=ochami-power-control-wait-for-etcd -o jsonpath='{.items[0].status}')"
-                sleep 3
-              elif [ $JOB_CONDITION_RC -ne 1 ]; then
-                echo "'kubectl get jobs' failed with exit code $JOB_CONDITION_RC , failing"
-                exit 1
-              else
-                echo "'kubectl get jobs' failed with exit code $JOB_CONDITION_RC , will retry"
-                sleep 3
-              fi
-            done
-        resources:
-          requests:
-            cpu: 30m
-            memory: "20Mi"
-          limits:
-            cpu: 500m
-            memory: "100Mi"
       containers:
       - name: ochami-power-control
         image: artifactory.algol60.net/csm-docker/stable/ochami-power-control:2.13.0
         imagePullPolicy: IfNotPresent
         env:
-          - name: ETCD_HOST
-            value: "ochami-power-control-bitnami-etcd"
-          - name: ETCD_PORT
-            value: "2379"
           - name: LOG_LEVEL
             value: INFO
           - name: SMS_SERVER
@@ -81,7 +44,7 @@ spec:
           - name: HSMLOCK_ENABLED
             value: "true"
           - name: STORAGE
-            value: ETCD
+            value: POSTGRES
           - name: PCS_CA_URI
             value: ""
           - name: MAX_NUM_COMPLETED
@@ -98,12 +61,6 @@ spec:
             value: "4000"
           - name: PCS_MAX_IDLE_CONNS_PER_HOST
             value: "4"
-          - name: ETCD_DISABLE_SIZE_CHECKS
-            value: "false"
-          - name: ETCD_PAGE_SIZE
-            value: "5000"
-          - name: ETCD_MAX_OBJECT_SIZE
-            value: "1570000"
           - name: MAX_TRANSITION_MESSAGE_LENGTH
             value: "130"
         ports:
