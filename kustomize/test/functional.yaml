@@ -1,0 +1,37 @@
+---
+# Source: ochami-power-control/templates/tests/test-functional.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "riptide-test-functional"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "1" #run this after smoke!
+
+  labels:
+    app.kubernetes.io/name: "riptide-test-functional"
+
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      name: "riptide-test-functional"
+      annotations:
+        "proxy.istio.io/config": '{ "holdApplicationUntilProxyStarts": true }'
+      labels:
+        app.kubernetes.io/managed-by:  "ochami-power-control"
+        app.kubernetes.io/instance:  "riptide-test-functional"
+        helm.sh/chart: "ochami-power-control-2.2.5"
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: "functional"
+          image: "artifactory.algol60.net/csm-docker/stable/ochami-power-control-hmth-test:2.13.0"
+          imagePullPolicy: "IfNotPresent"
+          command: ["/bin/sh", "-c"]
+          args: ["entrypoint.sh tavern -c /src/app/tavern_global_config_ct_test_production.yaml -p /src/app/api/1-non-disruptive"]

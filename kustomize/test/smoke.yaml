@@ -1,0 +1,37 @@
+---
+# Source: ochami-power-control/templates/tests/test-smoke.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "riptide-test-smoke"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "-1" #run this first!
+
+  labels:
+    app.kubernetes.io/name: "riptide-test-smoke"
+
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      name: "riptide-test-smoke"
+      annotations:
+        "proxy.istio.io/config": '{ "holdApplicationUntilProxyStarts": true }'
+      labels:
+        app.kubernetes.io/managed-by:  "ochami-power-control"
+        app.kubernetes.io/instance:  "riptide-test-smoke"
+        helm.sh/chart: "ochami-power-control-2.2.5"
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+      containers:
+        - name: "smoke"
+          image: "artifactory.algol60.net/csm-docker/stable/ochami-power-control-hmth-test:2.13.0"
+          imagePullPolicy: "IfNotPresent"
+          command: ["/bin/sh", "-c"]
+          args: ["entrypoint.sh smoke -f smoke.json -u http://ochami-power-control"]
