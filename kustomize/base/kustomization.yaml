@@ -6,7 +6,6 @@ resources:
 - deployment.yaml
 - service.yaml
 - istio-virtualservice.yaml
-- ca-configmap.yaml
 
 labels:
 - includeSelectors: true
