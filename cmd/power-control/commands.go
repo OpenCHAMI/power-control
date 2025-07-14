@@ -26,16 +26,6 @@ func addEnvVarToUsage(flags *pflag.FlagSet) {
 	})
 }
 
-// createEnvVarHelp creates a help function that adds environment variable usage to the command flags
-func createEnvVarHelp(defaultHelpFunc func(cmd *cobra.Command, args []string)) func(cmd *cobra.Command, args []string) {
-
-	return func(cmd *cobra.Command, args []string) {
-		addEnvVarToUsage(cmd.Flags())
-
-		defaultHelpFunc(cmd, args)
-	}
-}
-
 // createPostgresInitCommand creates a cobra command to initialize and migrate the Postgres database for Power Control Service
 func createPostgresInitCommand(postgres *storage.PostgresConfig, schema *schemaConfig) *cobra.Command {
 	cmd := &cobra.Command{
