@@ -32,9 +32,12 @@ CREATE TABLE IF NOT EXISTS transitions (
 	"status" VARCHAR(255) NOT NULL,
 	-- An array of {xname, credential} structs. Managing these in a separate table makes data integrity more
 	-- more complicated, and we never interact with them directly like we do with transitions.
-	"location" JSON
-	-- iscompressed omitted. AFAIK this should be handled in app-side representation of the struct
-	-- taskcounts omitted. AFAIK this is also built app-side from the tasks
+	"location" JSON,
+	-- compressed transitions only. when a transition completes, domain.compressAndCompleteTransition() deletes task rows
+	-- and shoves them all into the transition.
+	"compressed" BOOL,
+	"task_counts" JSON,
+	"tasks" JSON
 );
 
 CREATE TABLE IF NOT EXISTS transition_tasks (
