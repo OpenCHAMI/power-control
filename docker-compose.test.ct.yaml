@@ -41,8 +41,8 @@ services:
     networks:
       - pcs
 
-  postgres:
-    hostname: postgres
+  postgres-smd:
+    hostname: postgres-smd
     image: docker.io/library/postgres:11-alpine
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
@@ -54,14 +54,14 @@ services:
   smd-init:
     image: ghcr.io/openchami/smd:2.17
     environment:
-      - SMD_DBHOST=postgres
+      - SMD_DBHOST=postgres-smd
       - SMD_DBPORT=5432
       - SMD_DBNAME=hmsds
       - SMD_DBUSER=${POSTGRES_USER:-postgres}
       - SMD_DBPASS=${POSTGRES_PASSWORD:-postgres}
       - SMD_DBOPTS=sslmode=disable
     depends_on:
-      - postgres
+      - postgres-smd
     networks:
       - pcs
     command: /smd-init
@@ -69,7 +69,7 @@ services:
   smd:
     image: ghcr.io/openchami/smd:2.17
     environment:
-      - SMD_DBHOST=postgres
+      - SMD_DBHOST=postgres-smd
       - SMD_DBPORT=5432
       - SMD_DBNAME=hmsds
       - SMD_DBUSER=${POSTGRES_USER:-postgres}
@@ -294,6 +294,31 @@ services:
         aliases:
           - x0c0b0
 
+  postgres-pcs:
+    hostname: postgres-pcs
+    image: docker.io/library/postgres:11-alpine
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_DB=pcsdb
+    networks:
+      - pcs
+
+  power-control-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.ct.Dockerfile
+    command: ["power-control", "init-postgres"]
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=postgres-pcs
+      - POSTGRES_INSECURE=1
+    depends_on:
+      - postgres-pcs # needed to initialize PCS
+    networks:
+      - pcs
+
   #
   # Service under test
   #
@@ -317,13 +342,19 @@ services:
       - STORAGE=ETCD
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_HOST=postgres-pcs
+      - POSTGRES_INSECURE=1
       - PCS_POWER_SAMPLE_INTERVAL=5
+      - STORAGE=${STORAGE:-ETCD}
     depends_on:
       - etcd # needed to bring up PCS
       - smd # needed to bring up PCS
       - vault-kv-enabler # needed for discovery of emulated hardware to succeed
       - emulator-loader # needed to bring up emulated hardware
       - wait-for-smd # needed to give PCS time for its initial hardware scan
+      - power-control-init # needed to initialize PCS
     networks:
       - pcs
 
