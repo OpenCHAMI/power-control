@@ -134,11 +134,11 @@ type Transition struct {
 	// task set. However, it never sets this, and the full set of task info is always included in Transition.Tasks.
 
 	// IsCompressed indicates if the transition has its task counts tallied.
-	IsCompressed bool `json:"isCompressed"`
+	IsCompressed bool `json:"isCompressed" db:"compressed"`
 	// TaskCounts holds aggregate counts for task states.
-	TaskCounts TransitionTaskCounts `json:"taskCounts"`
+	TaskCounts TransitionTaskCounts `json:"taskCounts" db:"task_counts"`
 	// Tasks is a list of metadata about the transition's Tasks.
-	Tasks []TransitionTaskResp `json:"tasks,omitempty"`
+	Tasks TransitionTaskRespSlice `json:"tasks,omitempty" db:"tasks"`
 }
 
 type TransitionPage struct {
@@ -177,13 +177,13 @@ type TransitionRespArray struct {
 }
 
 type TransitionResp struct {
-	TransitionID            uuid.UUID            `json:"transitionID"`
-	Operation               string               `json:"operation"`
-	CreateTime              time.Time            `json:"createTime"`
-	AutomaticExpirationTime time.Time            `json:"automaticExpirationTime"`
-	TransitionStatus        string               `json:"transitionStatus"`
-	TaskCounts              TransitionTaskCounts `json:"taskCounts"`
-	Tasks                   []TransitionTaskResp `json:"tasks,omitempty"`
+	TransitionID            uuid.UUID               `json:"transitionID"`
+	Operation               string                  `json:"operation"`
+	CreateTime              time.Time               `json:"createTime"`
+	AutomaticExpirationTime time.Time               `json:"automaticExpirationTime"`
+	TransitionStatus        string                  `json:"transitionStatus"`
+	TaskCounts              TransitionTaskCounts    `json:"taskCounts"`
+	Tasks                   TransitionTaskRespSlice `json:"tasks,omitempty"`
 }
 
 type TransitionTaskCounts struct {
@@ -195,11 +195,39 @@ type TransitionTaskCounts struct {
 	Unsupported int `json:"un-supported"`
 }
 
+func (t TransitionTaskCounts) Value() (driver.Value, error) {
+	return json.Marshal(t)
+}
+
+func (t *TransitionTaskCounts) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &t)
+}
+
 type TransitionTaskResp struct {
 	Xname          string `json:"xname"`
 	TaskStatus     string `json:"taskStatus"`
 	TaskStatusDesc string `json:"taskStatusDescription"`
 	Error          string `json:"error,omitempty"`
+}
+
+type TransitionTaskRespSlice []TransitionTaskResp
+
+func (t TransitionTaskRespSlice) Value() (driver.Value, error) {
+	return json.Marshal(t)
+}
+
+func (t *TransitionTaskRespSlice) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &t)
 }
 
 type TransitionAbortResp struct {

@@ -262,3 +262,76 @@ func (s *StorageTestSuite) TestTransitionTAS() {
 	s.Require().ErrorContains(err, "could retrieve TAS transition")
 	s.Require().False(changed)
 }
+
+// TestTransitionCompress tests creating a transition and then compressing its tasks into it.
+func (s *StorageTestSuite) TestTransitionCompress() {
+	t := s.T()
+	var (
+		testParams     model.TransitionParameter
+		testTransition model.Transition
+		err            error
+	)
+
+	testParams = model.TransitionParameter{
+		Operation: "Init",
+		Location: []model.LocationParameter{
+			model.LocationParameter{Xname: "x0c0s1b0n0"},
+			model.LocationParameter{Xname: "x0c0s2b0n0"},
+			model.LocationParameter{Xname: "x0c0s1"},
+			model.LocationParameter{Xname: "x0c0s2"},
+		},
+	}
+
+	record := map[uuid.UUID]string{}
+
+	t.Logf("inserting some transitions and tasks")
+	testTransition, _ = model.ToTransition(testParams, 5)
+	testTransition.Status = model.TransitionStatusInProgress
+	task := model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
+	task.Xname = "x0c0s1b0n0"
+	task.Operation = model.Operation_Off
+	task.State = model.TaskState_Waiting
+	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
+	err = s.sp.StoreTransitionTask(task)
+	s.Require().NoError(err)
+	record[task.TaskID] = task.Xname
+
+	task = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
+	task.Xname = "x0c0s2b0n0"
+	task.Operation = model.Operation_Off
+	task.State = model.TaskState_Sending
+	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
+	err = s.sp.StoreTransitionTask(task)
+	s.Require().NoError(err)
+	record[task.TaskID] = task.Xname
+
+	task = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
+	task.Xname = "x0c0s1"
+	task.Operation = model.Operation_Init
+	task.State = model.TaskState_GatherData
+	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
+	err = s.sp.StoreTransitionTask(task)
+	s.Require().NoError(err)
+	record[task.TaskID] = task.Xname
+
+	err = s.sp.StoreTransition(testTransition)
+	s.Require().NoError(err)
+
+	tasks, err := s.sp.GetAllTasksForTransition(testTransition.TransitionID)
+	s.Require().NoError(err)
+
+	// stolen from the innards of domain.compressAndCompleteTransition().
+	rsp := model.ToTransitionResp(testTransition, tasks, true)
+	testTransition.TaskCounts = rsp.TaskCounts
+	testTransition.Tasks = rsp.Tasks
+	testTransition.IsCompressed = true
+
+	err = s.sp.StoreTransition(testTransition)
+	s.Require().NoError(err)
+
+	gotTransition, _, err := s.sp.GetTransition(testTransition.TransitionID)
+	s.Require().NoError(err)
+	s.Require().Equal(true, gotTransition.IsCompressed)
+	s.Require().Equal(rsp.TaskCounts, gotTransition.TaskCounts)
+	s.Require().Equal(rsp.Tasks, gotTransition.Tasks)
+}
