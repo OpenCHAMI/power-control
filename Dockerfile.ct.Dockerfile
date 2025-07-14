@@ -59,6 +59,7 @@ RUN set -ex \
 # Get the power-control from the builder stage.
 COPY --from=builder /usr/local/bin/power-control /usr/local/bin/.
 COPY configs configs
+COPY migrations migrations
 
 # Setup environment variables.
 ENV SMS_SERVER="http://cray-smd:27779"
