@@ -6,6 +6,12 @@ on:
 jobs:
   run_ct_tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        storage:
+          - ETCD
+          - POSTGRES
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -15,3 +21,5 @@ jobs:
           sudo apt-get install -y docker-compose make
       - name: Run ct tests
         run: make ct
+        env:
+          STORAGE: ${{ matrix.storage }}
