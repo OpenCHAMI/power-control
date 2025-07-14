@@ -38,10 +38,10 @@ func createPostgresInitCommand(postgres *storage.PostgresConfig, schema *schemaC
 		},
 	}
 
-	cmd.Flags().UintVar(&schema.step, "schema-step", schema.step, "Migration step to apply")
-	cmd.Flags().IntVar(&schema.forceStep, "schema-force-step", schema.forceStep, "Force migration to a specific step")
+	cmd.Flags().UintVar(&schema.step, "schema-step", SCHEMA_VERSION, "Migration step to apply")
+	cmd.Flags().IntVar(&schema.forceStep, "schema-force-step", -1, "Force migration to a specific step")
 	cmd.Flags().BoolVar(&schema.fresh, "schema-fresh", schema.fresh, "Drop all tables and start fresh")
-	cmd.Flags().StringVar(&schema.migrationDir, "schema-migrations", schema.migrationDir, "Directory for migration files")
+	cmd.Flags().StringVar(&schema.migrationDir, "schema-migrations", "./migrations/postgres", "Directory for migration files")
 
 	return cmd
 }
