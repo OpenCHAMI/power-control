@@ -486,9 +486,18 @@ func storeTransitionWithTx(tx *sqlx.Tx, transition model.Transition) error {
 		active,
 		expires,
 		location,
-		status
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	ON CONFLICT (id) DO UPDATE SET active = excluded.active, status = excluded.status`
+		status,
+		compressed,
+		task_counts,
+		tasks
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	ON CONFLICT (id) DO UPDATE SET
+		active = excluded.active,
+		status = excluded.status,
+		compressed = excluded.compressed,
+		task_counts = excluded.task_counts,
+		tasks = excluded.tasks
+		`
 	_, err := tx.Exec(
 		exec,
 		transition.TransitionID,
@@ -499,6 +508,9 @@ func storeTransitionWithTx(tx *sqlx.Tx, transition model.Transition) error {
 		transition.AutomaticExpirationTime,
 		transition.Location,
 		transition.Status,
+		transition.IsCompressed,
+		transition.TaskCounts,
+		transition.Tasks,
 	)
 	if err != nil {
 		return fmt.Errorf("Failed to store transition '%s': %w", transition.TransitionID, err)
