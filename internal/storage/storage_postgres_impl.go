@@ -283,6 +283,11 @@ func (p *PostgresStorage) GetPowerStatus(xname string) (psc model.PowerStatusCom
 
 	err = p.db.Get(&pscDB, "SELECT * FROM power_status_component WHERE xname = $1", xname)
 	if err != nil {
+		// Calling control flow code expects error containing "does not exist"
+		// We should consider indicating this condition explicitly in the interface function signature instead.
+		if errors.Is(err, sql.ErrNoRows) {
+			return model.PowerStatusComponent{}, fmt.Errorf("power status does not exist")
+		}
 
 		return model.PowerStatusComponent{}, err
 	}
@@ -409,6 +414,12 @@ func (p *PostgresStorage) GetPowerCapTask(taskID uuid.UUID) (model.PowerCapTask,
 	var task model.PowerCapTask
 	err := p.db.Get(&task, "SELECT * FROM power_cap_tasks WHERE id = $1", taskID)
 	if err != nil {
+		// Calling control flow code expects error containing "does not exist"
+		// We should consider indicating this condition explicitly in the interface function signature instead.
+		if errors.Is(err, sql.ErrNoRows) {
+			return model.PowerCapTask{}, fmt.Errorf("power cap task does not exist")
+		}
+
 		return model.PowerCapTask{}, fmt.Errorf("could not retrieve power cap task %s: %w", taskID, err)
 	}
 
@@ -554,6 +565,12 @@ func (p *PostgresStorage) StoreTransitionTask(op model.TransitionTask) error {
 func (p *PostgresStorage) GetTransition(transitionID uuid.UUID) (transition model.Transition, transitionFirstPage model.Transition, err error) {
 	err = p.db.Get(&transition, "SELECT * FROM transitions WHERE id = $1", transitionID)
 	if err != nil {
+		// Calling control flow code expects error containing "does not exist"
+		// We should consider indicating this condition explicitly in the interface function signature instead.
+		if errors.Is(err, sql.ErrNoRows) {
+			return model.Transition{}, model.Transition{}, fmt.Errorf("transition does not exist")
+		}
+
 		return model.Transition{}, model.Transition{}, err
 	}
 	return transition, transition, nil
