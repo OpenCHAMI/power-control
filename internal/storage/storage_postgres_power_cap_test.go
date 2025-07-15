@@ -183,7 +183,7 @@ func (s *StorageTestSuite) TestPowerCapTaskDelete() {
 
 	_, err = s.sp.GetPowerCapTask(task.TaskID)
 	s.Require().Error(err)
-	s.Require().ErrorContains(err, "could not retrieve power cap task")
+	s.Require().ErrorContains(err, "power cap task does not exist")
 
 }
 
