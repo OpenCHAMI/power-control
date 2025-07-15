@@ -388,7 +388,8 @@ func (p *PostgresStorage) StorePowerCapOperation(op model.PowerCapOperation) err
 		component
 	) VALUES ($1, $2, $3, $4, $5)
 	ON CONFLICT (id) DO UPDATE SET
-	status = excluded.status
+	status = excluded.status,
+	component = excluded.component
 	`
 	_, err := p.db.Exec(
 		exec,
