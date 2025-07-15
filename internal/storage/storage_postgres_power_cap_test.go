@@ -140,16 +140,30 @@ func (s *StorageTestSuite) TestPowerCapOperationGetSet() {
 	s.Require().Equal(op.Status, gotOp.Status)
 	s.Require().Equal(op.Component, gotOp.Component)
 
+	newMax := 1
+	newMin := 2
+	newPup := 3
+	newComponent := model.PowerCapComponent{
+		Xname: "x0c0s0b0n0",
+		Error: "MysteriousTestError",
+		Limits: &model.PowerCapabilities{
+			HostLimitMax: &newMax,
+			HostLimitMin: &newMin,
+			PowerupPower: &newPup,
+		},
+	}
 	op.Status = "MysteriousTestStatus"
 	op.Type = "MysteriousTestType"
+	op.Component = newComponent
 	err = s.sp.StorePowerCapOperation(op)
 	s.Require().NoError(err)
 
-	// we should be able to update status, but not other fields
+	// we should be able to update status and component, but not other fields
 	gotOp, err = s.sp.GetPowerCapOperation(task.TaskID, op.OperationID)
 	s.Require().NoError(err)
 	s.Require().Equal(snapshotType, gotOp.Type)
 	s.Require().Equal("MysteriousTestStatus", gotOp.Status)
+	s.Require().Equal(newComponent, gotOp.Component)
 }
 
 // TestPowerCapTaskDelete tests deleting a single power cap task.
