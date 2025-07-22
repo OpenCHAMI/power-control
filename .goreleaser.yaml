@@ -55,6 +55,7 @@ dockers:
       - CHANGELOG.md
       - README.md
       - configs/
+      - migrations/
 
   - image_templates:
       - &arm64v8_linux_image ghcr.io/openchami/{{.ProjectName}}:{{ .Tag }}-arm64
@@ -74,6 +75,7 @@ dockers:
       - CHANGELOG.md
       - README.md
       - configs/
+      - migrations/
 
 docker_manifests:
   - name_template: "ghcr.io/openchami/{{.ProjectName}}:latest"
