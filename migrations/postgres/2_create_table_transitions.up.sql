@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS transitions (
 	"location" JSON,
 	-- compressed transitions only. when a transition completes, domain.compressAndCompleteTransition() deletes task rows
 	-- and shoves them all into the transition.
-	"compressed" BOOL,
+	"compressed" BOOL NOT NULL DEFAULT FALSE,
 	"task_counts" JSON,
 	"tasks" JSON
 );

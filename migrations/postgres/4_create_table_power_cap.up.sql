@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS power_cap_tasks (
 	-- components and task_counts are only populated when compressed == true. these are completed tasks that have been
 	-- archived. components and task_counts are derived from the operations associated with this task, and summarize
 	-- those (deleted) rows.
-	"compressed" BOOL,
+	"compressed" BOOL NOT NULL DEFAULT FALSE,
 	"components" JSON,
 	"task_counts" JSON
 
