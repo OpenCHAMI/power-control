@@ -14,6 +14,7 @@ COPY go.mod $GOPATH/src/github.com/OpenCHAMI/power-control/v2/go.mod
 COPY go.sum $GOPATH/src/github.com/OpenCHAMI/power-control/v2/go.sum
 COPY configs configs
 COPY scripts scripts
+COPY migrations migrations
 
 # Build the image
 RUN go build -C $GOPATH/src/github.com/OpenCHAMI/power-control/v2/cmd/power-control -v \
