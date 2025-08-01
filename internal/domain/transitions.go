@@ -1605,6 +1605,10 @@ func generateTransitionPayload(comp *TransitionComponent, action string) (string
 		} else {
 			body = fmt.Sprintf(`{"PowerState": "%s"}`, resetType)
 		}
+		// If we have a JAWS PDU
+		if strings.Contains(comp.HSMData.PowerActionURI, "jaws") {
+			body = fmt.Sprintf(`{"control_action": "%s"}`, resetType)
+		}
 	} else {
 		body = fmt.Sprintf(`{"ResetType": "%s"}`, resetType)
 	}
