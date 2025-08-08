@@ -22,8 +22,9 @@ RUN go build -C $GOPATH/src/github.com/OpenCHAMI/power-control/v2/cmd/power-cont
     -o /usr/local/bin/power-control
 
 RUN go install github.com/go-delve/delve/cmd/dlv@v1.24.0
+RUN apt update; apt install tini
 
 USER 65534:65534
 
-ENTRYPOINT ["/usr/local/golib/bin/dlv"]
-CMD ["exec", "--continue", "--accept-multiclient",  "--headless", "--api-version=2", "--listen=:2345", "--log", "/usr/local/bin/power-control"]
+ENTRYPOINT ["tini", "--"]
+CMD ["/usr/local/golib/bin/dlv", "exec", "--continue", "--accept-multiclient",  "--headless", "--api-version=2", "--listen=:2345", "--log", "/usr/local/bin/power-control"]
