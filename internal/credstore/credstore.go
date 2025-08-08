@@ -32,6 +32,26 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type MockStore struct {
+	Username, Password string
+}
+
+func (s *MockStore) Init(_ *CREDSTORE_GLOBALS) {
+	return
+}
+
+func (s *MockStore) IsReady() bool {
+	return true
+}
+
+func (s *MockStore) GetCredentials(_ string) (string, string, error) {
+	return s.Username, s.Password, nil
+}
+
+func (s *MockStore) GetControllerCredentials(_ string) (string, string, error) {
+	return s.GetCredentials("")
+}
+
 func (b *VAULTv0) Init(globals *CREDSTORE_GLOBALS) {
 	b.CredStoreGlobals = CREDSTORE_GLOBALS{}
 	b.CredStoreGlobals = *globals

@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added support for pprof builds
+- Added a fake Vault drop-in credential store to set credentials from the environment.
 
 ### Changes
 
