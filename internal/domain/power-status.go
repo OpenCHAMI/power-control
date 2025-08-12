@@ -537,7 +537,7 @@ func getHWStatesFromHW() error {
 				taskList[taskIX].Ignore = true
 				taskIX++
 			} else {
-				url = "https://" + v.HSMData.RfFQDN + v.HSMData.PowerStatusURI
+				url = getPowerURL(v.HSMData.RfFQDN, v.HSMData.PowerStatusURI)
 				taskList[taskIX].Request, _ = http.NewRequest(http.MethodGet, url, nil)
 				taskList[taskIX].Request.SetBasicAuth(v.BmcUsername, v.BmcPassword)
 				taskList[taskIX].Request.Header.Set("Accept", "*/*")
