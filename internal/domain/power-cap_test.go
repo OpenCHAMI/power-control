@@ -70,7 +70,7 @@ func TestDoPowerCapTask(t *testing.T) {
 
 	task := model.NewPowerCapSnapshotTask(params, GLOB.ExpireTimeMins)
 
-	err = (*GLOB.DSP).StorePowerCapTask(task)
+	err = GLOB.DSP.StorePowerCapTask(task)
 	if err != nil {
 		t.Errorf("ERROR doPowerCapTask(1) failed - %s", err.Error())
 		return
@@ -119,7 +119,7 @@ func TestDoPowerCapTask(t *testing.T) {
 
 	task2 := model.NewPowerCapPatchTask(params2, GLOB.ExpireTimeMins)
 
-	err = (*GLOB.DSP).StorePowerCapTask(task2)
+	err = GLOB.DSP.StorePowerCapTask(task2)
 	if err != nil {
 		t.Errorf("ERROR doPowerCapTask(2) failed - %s", err.Error())
 		return
@@ -185,13 +185,13 @@ func TestDoPowerCapTask(t *testing.T) {
 	//       for the convenience of having 2 tasks
 	//       already in storage.
 	/////////
-	expiredTask, err := (*GLOB.DSP).GetPowerCapTask(task2.TaskID)
+	expiredTask, err := GLOB.DSP.GetPowerCapTask(task2.TaskID)
 	if err != nil {
 		t.Errorf("ERROR powerCapReaper() failed - %s", err.Error())
 		return
 	}
 	expiredTask.AutomaticExpirationTime = time.Now().Add(-3 * time.Second)
-	err = (*GLOB.DSP).StorePowerCapTask(expiredTask)
+	err = GLOB.DSP.StorePowerCapTask(expiredTask)
 	if err != nil {
 		t.Errorf("ERROR powerCapReaper() failed - %s", err.Error())
 		return
@@ -277,8 +277,8 @@ func doSetup() error {
 	}
 	HSM.Init(&hsmGlob)
 
-	domainGlobals.NewGlobals(&BaseTRSTask, &TLOC_rf, &TLOC_svc, nil, nil,
-		rfClientLock, &Running, &DSP, &HSM, VaultEnabled, nil, nil,
+	domainGlobals.NewGlobals(&BaseTRSTask, TLOC_rf, TLOC_svc, nil, nil,
+		rfClientLock, &Running, DSP, HSM, VaultEnabled, nil, nil,
 		20000, 1440, "power-cap_test-pod")
 	Init(&domainGlobals)
 	return nil
