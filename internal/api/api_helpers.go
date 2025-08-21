@@ -34,6 +34,14 @@ import (
 	"github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
+type IDList struct {
+	IDs []uuid.UUID `json:"ids"`
+}
+
+type IDResp struct {
+	ID uuid.UUID `json:"id"`
+}
+
 // WriteJSON - writes JSON to the open http connection
 func WriteJSON(w http.ResponseWriter, i interface{}) {
 	obj, err := json.Marshal(i)
@@ -57,9 +65,9 @@ func WriteHeaders(w http.ResponseWriter, pb model.Passback) {
 		w.WriteHeader(pb.StatusCode)
 		switch val := pb.Obj.(type) {
 		case []uuid.UUID:
-			WriteJSON(w, model.IDList{IDs: val})
+			WriteJSON(w, IDList{IDs: val})
 		case uuid.UUID:
-			WriteJSON(w, model.IDResp{ID: val})
+			WriteJSON(w, IDResp{ID: val})
 		default:
 			WriteJSON(w, pb.Obj)
 		}
