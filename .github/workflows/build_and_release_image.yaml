@@ -9,7 +9,7 @@ on:
 
 jobs:
   release:
-    uses: openchami/github-actions/.github/workflows/go-build-release.yml@3.2
+    uses: OpenCHAMI/github-actions/.github/workflows/go-build-release.yml@v3.2
     with:
       fetch-depth: 1
       pre-build-commands: |
