@@ -33,11 +33,11 @@ import (
 	"strings"
 	"time"
 
-	pcsmodel "github.com/OpenCHAMI/power-control/v2/internal/model"
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/sirupsen/logrus"
 
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/hashicorp/go-retryablehttp"
+	pcsmodel "github.com/OpenCHAMI/power-control/v2/internal/model"
 )
 
 type JawsEndpointStatus struct {
@@ -96,6 +96,7 @@ func JawsLoad(xname string, FQDN string, authUser string, authPass string) {
 	resp, err := client.Do(req)
 	defer drainAndCloseBodyWithCtxCancel(resp, reqCtxCancel)
 	if err != nil {
+		logger.Log.Error(err)
 		return
 	}
 
@@ -103,22 +104,26 @@ func JawsLoad(xname string, FQDN string, authUser string, authPass string) {
 	var eps []JawsEndpointStatus
 	if err != nil {
 		logger.Log.Error(err)
-	} else {
-		err = json.Unmarshal(body, &eps)
+		return
+	}
+	err = json.Unmarshal(body, &eps)
+	if err != nil {
+		logger.Log.Error(err)
+		return
+	}
 
-		// Store power state for each outlet
-		for _, jep2 := range eps {
-			epxname := jaws2xname(xname, jep2.Id)
+	// Store power state for each outlet
+	for _, jep2 := range eps {
+		epxname := jaws2xname(xname, jep2.Id)
 
-			powerState := pcsmodel.PowerStateFilter_Undefined
-			if strings.EqualFold(jep2.State, "on") {
-				powerState = pcsmodel.PowerStateFilter_On
-			} else if strings.EqualFold(jep2.State, "off") {
-				powerState = pcsmodel.PowerStateFilter_Off
-			}
-
-			updateHWState(epxname, powerState, pcsmodel.ManagementStateFilter_available, "")
+		powerState := pcsmodel.PowerStateFilter_Undefined
+		if strings.EqualFold(jep2.State, "on") {
+			powerState = pcsmodel.PowerStateFilter_On
+		} else if strings.EqualFold(jep2.State, "off") {
+			powerState = pcsmodel.PowerStateFilter_Off
 		}
+
+		updateHWState(epxname, powerState, pcsmodel.ManagementStateFilter_available, "")
 	}
 	return
 }
