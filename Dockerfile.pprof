@@ -80,8 +80,6 @@ ENV CRAY_VAULT_AUTH_PATH="auth/token/create"
 ENV CRAY_VAULT_ROLE_FILE="/configs/namespace"
 ENV CRAY_VAULT_JWT_FILE="/configs/token"
 
-ENV GODEBUG="tlsrsakex=1"
-
 ENV PCS_JAWS_MONITOR="true"
 ENV PCS_JAWS_MONITOR_INTERVAL="20"
 

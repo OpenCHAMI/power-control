@@ -48,8 +48,6 @@ ENV CRAY_VAULT_AUTH_PATH="auth/token/create"
 ENV CRAY_VAULT_ROLE_FILE="/go/configs/namespace"
 ENV CRAY_VAULT_JWT_FILE="/go/configs/token"
 
-ENV GODEBUG="tlsrsakex=1"
-
 ENV PCS_JAWS_MONITOR="true"
 ENV PCS_JAWS_MONITOR_INTERVAL="20"
 

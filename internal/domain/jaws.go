@@ -64,11 +64,26 @@ type JawsEndpointStatus struct {
 	Voltage             float32 `json:"voltage"`
 }
 
+func jawsSuites() []uint16 {
+	suites := []uint16{tls.TLS_RSA_WITH_AES_128_GCM_SHA256, tls.TLS_RSA_WITH_AES_256_GCM_SHA384, tls.TLS_RSA_WITH_AES_128_CBC_SHA, tls.TLS_RSA_WITH_AES_256_CBC_SHA}
+	for _, c := range tls.CipherSuites() {
+		suites = append(suites, c.ID)
+	}
+	return suites
+}
+
 // Load JAWS outlets and store
 func JawsLoad(xname string, FQDN string, authUser string, authPass string) {
+
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+		CipherSuites:       jawsSuites(),
+	}
+
 	timeout := 20
 	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		//		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: tlsConfig,
 	}
 	client := retryablehttp.NewClient()
 	client.HTTPClient.Transport = transport
