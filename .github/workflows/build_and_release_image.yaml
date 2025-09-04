@@ -11,9 +11,8 @@ on:
 jobs:
   goreleaser:
     name: GoReleaser ${{ startsWith(github.ref, 'refs/tags/v') && 'Release' || 'Snapshot' }}
-    # TODO: Switch to openchami once tagged
-    uses: taylorludwig/openchami-github-actions/.github/workflows/go-build-release.yml@feature/go-build-release-tweaks
-    # uses: OpenCHAMI/github-actions/.github/workflows/go-build-release.yml@v3.3
+    # TODO: Switch to openchami tag once tagged
+    uses: OpenCHAMI/github-actions/.github/workflows/go-build-release.yml@9b25637
     with:
       fetch-depth: 1
       pre-build-commands: |
