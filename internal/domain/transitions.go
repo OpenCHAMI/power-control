@@ -784,7 +784,7 @@ func doTransition(transitionID uuid.UUID) {
 			comp.Task.Operation = powerActionOp
 			trsTaskMap[trsTaskList[trsTaskIdx].GetID()] = comp
 			trsTaskList[trsTaskIdx].CPolicy.Retry.Retries = 3
-			trsTaskList[trsTaskIdx].Request, _ = http.NewRequest("POST", "https://"+comp.HSMData.RfFQDN+comp.HSMData.PowerActionURI, bytes.NewBuffer([]byte(payload)))
+			trsTaskList[trsTaskIdx].Request, _ = http.NewRequest(http.MethodPost, getPowerURL(comp.HSMData.RfFQDN, comp.HSMData.PowerActionURI), bytes.NewBuffer([]byte(payload)))
 			trsTaskList[trsTaskIdx].Request.Header.Set("Content-Type", "application/json")
 			trsTaskList[trsTaskIdx].Request.Header.Add("HMS-Service", GLOB.BaseTRSTask.ServiceName)
 			// Vault enabled?
