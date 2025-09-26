@@ -71,6 +71,7 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 	rootCommand.Flags().StringVar(&pcs.stateManagerServer, "sms-server", defaultSMSServer, "SMS Server")
 	rootCommand.Flags().BoolVar(&pcs.runControl, "run-control", pcs.runControl, "run control loop; false runs API only") //this was a flag useful for dev work
 	rootCommand.Flags().BoolVar(&pcs.hsmLockEnabled, "hsmlock-enabled", true, "Use HSM Locking")                         // This was a flag useful for dev work
+	rootCommand.Flags().BoolVar(&pcs.fakeVaultEnabled, "fake-vault-enabled", false, fmt.Sprintf("Use a mock credential store that uses %s and %s for all BMCs.", fakeVaultUserEnv, fakeVaultPasswordEnv))
 	rootCommand.Flags().BoolVar(&pcs.vaultEnabled, "vault-enabled", true, "Should vault be used for credentials?")
 	rootCommand.Flags().StringVar(&pcs.vaultKeypath, "vault-keypath", "secret/hms-creds",
 		"Keypath for Vault credentials.")

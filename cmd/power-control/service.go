@@ -47,6 +47,11 @@ const (
 	dfltMaxHTTPBackoff = 8
 )
 
+const (
+	fakeVaultUserEnv     = "PCS_FAKE_VAULT_REDFISH_USER"
+	fakeVaultPasswordEnv = "PCS_FAKE_VAULT_REDFISH_PASSWORD"
+)
+
 var (
 	Running                          = true
 	restSrv             *http.Server = nil
@@ -66,6 +71,7 @@ var (
 
 // pcsConfig holds the configuration for the Power Control Service (PCS).
 type pcsConfig struct {
+	fakeVaultEnabled   bool
 	vaultEnabled       bool
 	vaultKeypath       string
 	stateManagerServer string
@@ -82,6 +88,12 @@ type etcdConfig struct {
 	pageSize          int
 	maxObjectSize     int
 	maxMessageLength  int
+}
+
+// fakeVault holds fake BMC credentials to use when the fake Vault is enabled.
+type fakeVault struct {
+	User     string
+	Password string
 }
 
 // runPCS runs the Power Control Service (PCS).
@@ -101,6 +113,7 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig) 
 	logger.Log.Info("SMS Server: " + pcs.stateManagerServer)
 	logger.Log.Info("HSM Lock Enabled: ", pcs.hsmLockEnabled)
 	logger.Log.Info("Vault Enabled: ", pcs.vaultEnabled)
+	logger.Log.Info("Fake Vault Enabled: ", pcs.fakeVaultEnabled)
 	logger.Log.Info("Max Completed Records: ", pcs.maxNumCompleted)
 	logger.Log.Info("Completed Record Expire Time: ", pcs.expireTimeMins)
 	logger.Log.SetReportCaller(true)
@@ -280,14 +293,46 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig) 
 	HSM.Init(&hsmGlob)
 	//TODO: there should be a Ping() to insure HSM is alive
 
-	//Vault CONFIGURATION
-	tmpCS := &credstore.VAULTv0{}
-
-	CS = tmpCS
-	if pcs.vaultEnabled {
+	// TODO The original Vault configuration is awkward for proceeding with https://github.com/OpenCHAMI/roadmap/issues/74
+	// Ideally we'd use a switch on a string flag, but the current flag is a bool. It's furthermore default true, so
+	// annoying to make mutually exclusive.
+	//
+	// Handling that well would require breaking changes. Pending expanded support for several SecureStorage
+	// implementations, the kludgy approach is to expect that setting the new default false --fake-vault-enabled
+	// means you do want that, so we can use the ugly else-if chain below, with the original disabled empty
+	// credstore.VAULTv0 as the pseudo-default case.
+	if pcs.fakeVaultEnabled {
+		var mockUser, mockPass string
+		// fakeVaultUserEnv and fakeVaultPasswordEnv are constant env-only args. We may or may not want full args
+		// for them following a breaking redesign of credential store configuration. Env only is easier to work
+		// with, since it doesn't require config struct plumbing, and is simpler to refactor as such. Env only is kinda
+		// okay for them, since we don't need them in any other CLI command.
+		if user, exists := os.LookupEnv(fakeVaultUserEnv); exists {
+			mockUser = user
+		} else {
+			logger.Log.Errorf("%s must be set if fake Vault is enabled", fakeVaultUserEnv)
+			os.Exit(1)
+		}
+		if pass, exists := os.LookupEnv(fakeVaultPasswordEnv); exists {
+			mockPass = pass
+		} else {
+			logger.Log.Errorf("%s must be set if fake Vault is enabled", fakeVaultPasswordEnv)
+			os.Exit(1)
+		}
+		tmpCS := &credstore.MockStore{Username: mockUser, Password: mockPass}
+		CS = tmpCS
+	} else if pcs.vaultEnabled {
+		//Vault CONFIGURATION
+		// The CRAY_VAULT_AUTH_PATH and similar config for the original Vault SecureStorage are buried down in its package,
+		// and can't be set via flags:
+		// https://github.com/Cray-HPE/hms-securestorage/blob/v1.18.0/vaultAdapter.go#L382-L409
+		CS = &credstore.VAULTv0{}
 		var credStoreGlob credstore.CREDSTORE_GLOBALS
 		credStoreGlob.NewGlobals(logger.Log, &Running, pcs.credCacheDuration, pcs.vaultKeypath)
 		CS.Init(&credStoreGlob)
+	} else {
+		tmpCS := &credstore.VAULTv0{}
+		CS = tmpCS
 	}
 
 	// Capture hostname, which is the name of the pod
