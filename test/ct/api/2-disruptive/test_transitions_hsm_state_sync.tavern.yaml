@@ -1,0 +1,241 @@
+# Test to verify PCS notifies SMD of power state changes after transitions
+
+---
+test_name: Verify PCS notifies SMD of power state changes
+
+stages:
+  - name: Get a compute node from SMD
+    request:
+      url: "{hsm_base_url}/hsm/v2/State/Components?type=Node&role=Compute&locked=False"
+      method: GET
+      verify: !bool "{verify}"
+    response:
+      status_code: 200
+      save:
+        json:
+          node_xname: Components[0].ID
+          initial_hsm_state: Components[0].State
+
+  - name: Power the target node on
+    request:
+      url: "{pcs_base_url}/transitions"
+      json: {"operation":"on","taskDeadlineMinutes": !int "{transition_on_task_deadline_minutes}","location":[{"xname":"{node_xname}"}]}
+      method: POST
+      verify: !bool "{verify}"
+    response:
+      status_code: 200
+      verify_response_with:
+        function: tavern.testutils.helpers:validate_pykwalify
+        extra_kwargs:
+          schema:
+            type: map
+            required: True
+            mapping:
+              transitionID:
+                type: str
+                required: True
+              operation:
+                required: True
+                type: str
+                enum:
+                  - "On"
+      save:
+        json:
+          transition_id_prep: transitionID
+
+
+  - name: Poll until the on transition operation has completed
+    max_retries: !int "{transition_on_num_attempts}"
+    delay_after: !float "{transition_on_poll_interval}"
+    request:
+      url: "{pcs_base_url}/transitions/{transition_id_prep}"
+      method: GET
+      verify: !bool "{verify}"
+    response:
+      status_code: 200
+      verify_response_with:
+        function: tavern.testutils.helpers:validate_pykwalify
+        extra_kwargs:
+          schema:
+            type: map
+            required: True
+            # only wait for the operation to complete
+            allowempty: True
+            mapping:
+              transitionStatus:
+                type: str
+                required: True
+                enum:
+                  - "completed"
+
+  - name: Verify PCS power status shows on
+    request:
+      url: "{pcs_base_url}/power-status?xname={node_xname}"
+      method: GET
+      verify: !bool "{verify}"
+    response:
+      status_code: 200
+      verify_response_with:
+        function: tavern.testutils.helpers:validate_pykwalify
+        extra_kwargs:
+          schema:
+            type: map
+            required: True
+            mapping:
+              status:
+                type: seq
+                matching: all
+                required: True
+                sequence:
+                  - type: map
+                    required: True
+                    allowempty: True
+                    mapping:
+                      xname:
+                        type: str
+                        required: True
+                        enum:
+                          - "{node_xname}"
+                      powerState:
+                        type: str
+                        required: True
+                        enum:
+                          - "on"
+
+
+  - name: Verify SMD state matches PCS state
+    request:
+      url: "{hsm_base_url}/hsm/v2/State/Components/{node_xname}"
+      method: GET
+      verify: !bool "{verify}"
+    response:
+      status_code: 200
+      verify_response_with:
+        function: tavern.testutils.helpers:validate_pykwalify
+        extra_kwargs:
+          schema:
+            type: map
+            required: True
+            allowempty: True
+            mapping:
+              ID:
+                type: str
+                required: True
+                enum:
+                  - "{node_xname}"
+              State:
+                type: str
+                required: True
+                enum:
+                  - "On"
+
+  - name: Power the node off
+    request:
+      url: "{pcs_base_url}/transitions"
+      json: {"operation":"off","taskDeadlineMinutes": !int "{transition_off_task_deadline_minutes}","location":[{"xname":"{node_xname}"}]}
+      method: POST
+      verify: !bool "{verify}"
+    response:
+      status_code: 200
+      verify_response_with:
+        function: tavern.testutils.helpers:validate_pykwalify
+        extra_kwargs:
+          schema:
+            type: map
+            required: True
+            mapping:
+              transitionID:
+                type: str
+                required: True
+              operation:
+                required: True
+                type: str
+                enum:
+                  - "Off"
+      save:
+        json:
+          transition_id_off: transitionID
+
+  - name: Poll until the off transition operation has completed
+    max_retries: !int "{transition_off_num_attempts}"
+    delay_after: !float "{transition_off_poll_interval}"
+    request:
+      url: "{pcs_base_url}/transitions/{transition_id_off}"
+      method: GET
+      verify: !bool "{verify}"
+    response:
+      status_code: 200
+      verify_response_with:
+        function: tavern.testutils.helpers:validate_pykwalify
+        extra_kwargs:
+          schema:
+            type: map
+            required: True
+            # only wait for the operation to complete
+            allowempty: True
+            mapping:
+              transitionStatus:
+                type: str
+                required: True
+                enum:
+                  - "completed"
+
+  - name: Verify PCS power status shows off
+    request:
+      url: "{pcs_base_url}/power-status?xname={node_xname}"
+      method: GET
+      verify: !bool "{verify}"
+    response:
+      status_code: 200
+      verify_response_with:
+        function: tavern.testutils.helpers:validate_pykwalify
+        extra_kwargs:
+          schema:
+            type: map
+            required: True
+            mapping:
+              status:
+                type: seq
+                matching: all
+                required: True
+                sequence:
+                  - type: map
+                    required: True
+                    allowempty: True
+                    mapping:
+                      xname:
+                        type: str
+                        required: True
+                        enum:
+                          - "{node_xname}"
+                      powerState:
+                        type: str
+                        required: True
+                        enum:
+                          - "off"
+
+  - name: Verify HSM state matches PCS state
+    request:
+      url: "{hsm_base_url}/hsm/v2/State/Components/{node_xname}"
+      method: GET
+      verify: !bool "{verify}"
+    response:
+      status_code: 200
+      verify_response_with:
+        function: tavern.testutils.helpers:validate_pykwalify
+        extra_kwargs:
+          schema:
+            type: map
+            required: True
+            allowempty: True
+            mapping:
+              ID:
+                type: str
+                required: True
+                enum:
+                  - "{node_xname}"
+              State:
+                type: str
+                required: True
+                enum:
+                  - "Off"
