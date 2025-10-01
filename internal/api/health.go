@@ -66,13 +66,13 @@ func GetReadiness(w http.ResponseWriter, req *http.Request) {
 
 	//Check KVStore and dist locks
 
-	err = (*glb.DSP).Ping()
+	err = glb.DSP.Ping()
 	if err != nil {
 		logger.Log.Errorf("%s: Ping() failed to storage provider.", fname)
 		ready = false
 	}
 
-	err = (*glb.DistLock).Ping()
+	err = glb.DistLock.Ping()
 	if err != nil {
 		logger.Log.Errorf("%s: Ping() failed to dist lock provider.", fname)
 		ready = false
@@ -80,7 +80,7 @@ func GetReadiness(w http.ResponseWriter, req *http.Request) {
 
 	//Check HSM
 
-	err = (*glb.HSM).Ping()
+	err = glb.HSM.Ping()
 	if err != nil {
 		logger.Log.Errorf("%s: Ping() failed to HSM.", fname)
 		ready = false
@@ -89,7 +89,7 @@ func GetReadiness(w http.ResponseWriter, req *http.Request) {
 	//Check Vault
 
 	if glb.VaultEnabled {
-		if !(*glb.CS).IsReady() {
+		if !glb.CS.IsReady() {
 			logger.Log.Errorf("%s: Cred store is not ready.", fname)
 			ready = false
 		}
@@ -97,7 +97,7 @@ func GetReadiness(w http.ResponseWriter, req *http.Request) {
 
 	//Check TRS
 
-	alive, terr := (*glb.RFTloc).Alive()
+	alive, terr := glb.RFTloc.Alive()
 	if !alive || (terr != nil) {
 		logger.Log.Infof("%s: TRS not alive, err: %v", fname, err)
 		ready = false
@@ -132,7 +132,7 @@ func GetHealth(w http.ResponseWriter, req *http.Request) {
 	if glb.DSP == nil {
 		rspData.KvStore = unconnected
 	} else {
-		err = (*glb.DSP).Ping()
+		err = glb.DSP.Ping()
 		if err == nil {
 			rspData.KvStore = connected + sep + responsive
 		} else {
@@ -143,7 +143,7 @@ func GetHealth(w http.ResponseWriter, req *http.Request) {
 	if glb.DistLock == nil {
 		rspData.DistLocking = unconnected
 	} else {
-		err = (*glb.DistLock).Ping()
+		err = glb.DistLock.Ping()
 		if err == nil {
 			rspData.DistLocking = connected + sep + responsive
 		} else {
@@ -156,7 +156,7 @@ func GetHealth(w http.ResponseWriter, req *http.Request) {
 	if glb.HSM == nil {
 		rspData.StateManager = unconnected
 	} else {
-		err = (*glb.HSM).Ping()
+		err = glb.HSM.Ping()
 		if err == nil {
 			rspData.StateManager = connected + sep + responsive
 		} else {
@@ -170,7 +170,7 @@ func GetHealth(w http.ResponseWriter, req *http.Request) {
 		if glb.CS == nil {
 			rspData.Vault = unconnected
 		} else {
-			if (*glb.CS).IsReady() {
+			if glb.CS.IsReady() {
 				rspData.Vault = connected + sep + responsive
 			} else {
 				rspData.Vault = connected + sep + unresponsive
@@ -185,7 +185,7 @@ func GetHealth(w http.ResponseWriter, req *http.Request) {
 	if glb.RFTloc == nil {
 		rspData.TaskRunner = unconnected
 	} else {
-		alive, terr := (*glb.RFTloc).Alive()
+		alive, terr := glb.RFTloc.Alive()
 		if terr != nil {
 			rspData.TaskRunner = unconnected + sep + unresponsive
 		} else {
@@ -196,7 +196,7 @@ func GetHealth(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-		ktype := reflect.TypeOf((*glb.RFTloc)).String()
+		ktype := reflect.TypeOf(glb.RFTloc).String()
 		ktypeTL := strings.ToLower(ktype)
 		if strings.Contains(ktypeTL, "local") {
 			rspData.TaskRunner = rspData.TaskRunner + sep + localmode
