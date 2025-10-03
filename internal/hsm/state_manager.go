@@ -49,6 +49,7 @@ const (
 	hsmReservationPath                = "/hsm/v2/locks/service/reservations"
 	hsmReservationReleasePath         = "/hsm/v2/locks/service/reservations/release"
 	hsmPowerMapPath                   = "/hsm/v2/sysinfo/powermaps"
+	hsmStateComponentsBulkStateData   = "/hsm/v2/State/Components/BulkStateData"
 
 	HSM_MAX_COMPONENT_QUERY = 2000
 )
@@ -689,4 +690,54 @@ func (b *HSMv2) FillHSMData(xnames []string) (map[string]*HsmData, error) {
 	}
 
 	return hdata, nil
+}
+
+type BulkStateData struct {
+	ComponentIDs []string `json:"ComponentIDs"`
+	State        string   `json:"State"`
+}
+
+func (b *HSMv2) BulkComponentStateUpdate(xnames []string, state string) error {
+	smurl := b.HSMGlobals.SMUrl + hsmStateComponentsBulkStateData
+
+	bulkStateData := BulkStateData{
+		ComponentIDs: xnames,
+		State:        state,
+	}
+
+	bulkUpdate, err := json.Marshal(&bulkStateData)
+	if err != nil {
+		return fmt.Errorf("Error marshalling HSM bulk state data: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, smurl, bytes.NewBuffer(bulkUpdate))
+	if err != nil {
+		return fmt.Errorf("ERROR creating HTTP request for '%s': %v", smurl, err)
+	}
+
+	reqContext, reqCtxCancel := context.WithTimeout(context.Background(), 40*time.Second)
+
+	req = req.WithContext(reqContext)
+
+	rsp, rsperr := b.HSMGlobals.SVCHttpClient.Do(req)
+
+	defer base.DrainAndCloseResponseBody(rsp)
+	defer reqCtxCancel()
+
+	if rsperr != nil {
+		return fmt.Errorf("Error in http request '%s': %v", smurl, rsperr)
+	}
+
+	if rsp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(rsp.Body)
+		return fmt.Errorf("Error in http request '%s': status code %d, response: %s",
+			smurl, rsp.StatusCode, string(body))
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"componentCount": len(xnames),
+		"state":          state,
+	}).Debug("Successfully updated HSM component states")
+
+	return nil
 }

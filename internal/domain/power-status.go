@@ -880,12 +880,37 @@ func monitorHW() {
 		//Update the current power states of all components in the component
 		//map by reading the actual hardware.
 
+		// Save the time so we can see which components got updated
+		updated := time.Now()
 		err = getHWStatesFromHW()
 
 		if err != nil {
 			//This means probably nothing got anywhere, so ignore it.
 			glogger.Errorf("ERROR getting HW states: %v", err)
 			continue
+		}
+
+		// Find which components have been updated so we can perform
+		// a bulk update on SMD. Note that we may get some false positives as
+		// the the status field may not be the property updated, but for now
+		// this is acceptable.
+		var updatedComponents []pcsmodel.PowerStatusComponent
+		for _, comp := range hwStateMap {
+			if comp.PSComp.LastUpdated.After(updated) {
+				updatedComponents = append(updatedComponents, comp.PSComp)
+			}
+		}
+
+		// Update SMD with new power states
+		if len(updatedComponents) > 0 {
+			err = updateSmdPowerState(updatedComponents)
+			if err != nil {
+				glogger.Errorf("ERROR updating SMD power states: %v", err)
+				// Continue monitoring even if SMD update fails
+				continue
+			}
+
+			glogger.Infof("Successfully updated SMD power states for %d components", len(updatedComponents))
 		}
 	}
 }
@@ -1077,4 +1102,41 @@ func startPowerStatusMaster(lastUpdated time.Time) {
 			lastUpdated = now
 		}
 	}
+}
+
+func updateSmdPowerState(updatedComponents []pcsmodel.PowerStatusComponent) error {
+	// The states we care about propagating to SMD, currently only On and Off?
+	// Looking at the SMD code, it implies that only On and Off should be updated
+	// via endpoints, the likes of Unknown, Empty are "internal" states:
+	// https://github.com/OpenCHAMI/smd/blob/v2.19.0/SMD-DESIGN.md?plain=1#L339-L353
+	stateToPropagate := []string{pcsmodel.PowerStateFilter_On.String(), pcsmodel.PowerStateFilter_Off.String()}
+
+	// Split the updated components by state
+	compsByState := make(map[string][]string)
+	for _, state := range stateToPropagate {
+		compsByState[state] = make([]string, 0)
+	}
+
+	for _, comp := range updatedComponents {
+		if _, ok := compsByState[comp.PowerState]; ok {
+			compsByState[comp.PowerState] = append(compsByState[comp.PowerState], comp.XName)
+		}
+	}
+
+	// For each state, do a bulk update to SMD
+	// Note if the number of components becomes excessive, we can do a series of
+	// batch updates here.
+	for state, components := range compsByState {
+		// Skip if no components to update
+		if len(components) == 0 {
+			continue
+		}
+
+		err := (*hsmHandle).BulkComponentStateUpdate(components, state)
+		if err != nil {
+			return fmt.Errorf("Error performing SMD bulk state update: %v", err)
+		}
+	}
+
+	return nil
 }

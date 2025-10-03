@@ -9,12 +9,17 @@ variables:
   transition_force-off_num_attempts: 62
   transition_force-off_poll_interval: 1
   transition_force-off_task_deadline_minutes: 1
+  transition_off_task_deadline_minutes: 1
   transition_on_num_attempts: 62
   transition_on_poll_interval: 1
   transition_on_task_deadline_minutes: 1
   transition_hard-restart_num_attempts: 62
   transition_hard-restart_poll_interval: 1
   transition_hard-restart_task_deadline_minutes: 1
+  transition_off_task_deadline_minutes: 7
+  transition_off_num_attempts: 61
+  transition_off_poll_interval: 7
+  transition_off_task_deadline_minutes: 7
   power-cap_snapshot_num_attempts: 30
   power-cap_snapshot_poll_interval: 1
   power-cap_patch_num_attempts: 30
