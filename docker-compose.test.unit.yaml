@@ -69,7 +69,7 @@ services:
     networks:
       - pcs
   smd-init:
-    image: ghcr.io/openchami/smd:2.17
+    image: ghcr.io/openchami/smd:2.19
     environment:
       - SMD_DBHOST=postgres
       - SMD_DBPORT=5432
@@ -83,7 +83,7 @@ services:
       - pcs
     command: /smd-init
   smd:
-    image: ghcr.io/openchami/smd:2.17
+    image: ghcr.io/openchami/smd:2.19
     environment:
       - SMD_DBHOST=postgres
       - SMD_DBPORT=5432
@@ -103,6 +103,7 @@ services:
       - SMD_RVAULT=true
       - SMD_SLS_HOST=
       - SMD_HBTD_HOST=
+      - ENABLE_DISCOVERY=true
     volumes:
       - ./configs/namespace:/configs/namespace
       - ./configs/token:/configs/token
