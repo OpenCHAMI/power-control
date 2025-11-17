@@ -14,6 +14,8 @@ import (
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/OpenCHAMI/power-control/v2/internal/api"
 	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
@@ -96,8 +98,16 @@ type fakeVault struct {
 	Password string
 }
 
+// oauth2Config holds the OAuth2 configuration for SMD communication.
+type oauth2Config struct {
+	tokenURL     string
+	clientID     string
+	clientSecret string
+	scopes       []string
+}
+
 // runPCS runs the Power Control Service (PCS).
-func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig) {
+func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2Config *oauth2Config) {
 	logger.Log.Error()
 
 	serviceName, err := base.GetServiceInstanceName()
@@ -215,8 +225,52 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig) 
 
 	TLOC_rf.Init(serviceName, trsLogger)
 	TLOC_svc.Init(serviceName, trsLogger)
-	rfClient, _ = hms_certs.CreateRetryableHTTPClientPair("", dfltMaxHTTPTimeout, dfltMaxHTTPRetries, dfltMaxHTTPBackoff)
-	svcClient, _ = hms_certs.CreateRetryableHTTPClientPair("", dfltMaxHTTPTimeout, dfltMaxHTTPRetries, dfltMaxHTTPBackoff)
+	rfClient, err := hms_certs.CreateRetryableHTTPClientPair("", dfltMaxHTTPTimeout, dfltMaxHTTPRetries, dfltMaxHTTPBackoff)
+	if err != nil {
+		logger.Log.Fatalf("Error creating RF HTTP client: %v", err)
+	}
+
+	svcClient, err = hms_certs.CreateRetryableHTTPClientPair("", dfltMaxHTTPTimeout, dfltMaxHTTPRetries, dfltMaxHTTPBackoff)
+	if err != nil {
+		logger.Log.Fatalf("Error creating SMD HTTP client: %v", err)
+	}
+
+	// Chain HTTP clients with OAuth2 if configured
+	if oauth2Config != nil {
+		clientConfig := &clientcredentials.Config{
+			ClientID:     oauth2Config.clientID,
+			ClientSecret: oauth2Config.clientSecret,
+			TokenURL:     oauth2Config.tokenURL,
+			Scopes:       oauth2Config.scopes,
+			AuthStyle:    oauth2.AuthStyleInHeader,
+		}
+
+		logger.Log.Info("Configuring SMD client with OAuth2")
+
+		ctx := context.Background()
+		ts := clientConfig.TokenSource(ctx)
+
+		if c := svcClient.SecureClient; c != nil {
+			baseTransport := c.HTTPClient.Transport
+			if baseTransport == nil {
+				baseTransport = http.DefaultTransport
+			}
+			c.HTTPClient.Transport = &oauth2.Transport{
+				Source: ts,
+				Base:   baseTransport,
+			}
+		}
+		if c := svcClient.InsecureClient; c != nil {
+			baseTransport := c.HTTPClient.Transport
+			if baseTransport == nil {
+				baseTransport = http.DefaultTransport
+			}
+			c.HTTPClient.Transport = &oauth2.Transport{
+				Source: ts,
+				Base:   baseTransport,
+			}
+		}
+	}
 
 	//STORAGE/DISTLOCK CONFIGURATION
 	envstr = os.Getenv("STORAGE")
