@@ -40,10 +40,11 @@ func main() {
 	postgres := storage.DefaultPostgresConfig()
 	var etcd etcdConfig
 	var schema schemaConfig
+	var oauth2 oauth2Config
 
 	logger.Init()
 
-	rootCommand := createRootCommand(&pcs, &etcd, &postgres)
+	rootCommand := createRootCommand(&pcs, &etcd, &postgres, &oauth2)
 	// Add the Postgres initialization command
 	rootCommand.AddCommand(createPostgresInitCommand(&postgres, &schema))
 
