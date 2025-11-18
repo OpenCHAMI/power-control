@@ -1,0 +1,72 @@
+### builder
+# Build the binary
+# TODO this needs to match go.mod. Unsure how they can be
+# kept in sync.
+FROM --platform=$BUILDPLATFORM golang:1.24 AS builder
+
+ARG GOPATH
+ARG GOCACHE
+
+ARG TARGETPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+
+ARG CC
+
+RUN printf "Building for TARGETPLATFORM=${TARGETPLATFORM}" \
+    && printf ", TARGETARCH=${TARGETARCH}" \
+    && printf ", TARGETOS=${TARGETOS}" \
+    && printf ", TARGETVARIANT=${TARGETVARIANT} \n" \
+    && printf "With 'uname -s': $(uname -s) and 'uname -m': $(uname -m)"
+
+WORKDIR /workspace
+
+# TODO
+# We currently have a lot of variance in directory structure.
+# This is annoying for Dockerfile design; we can't just consistently
+# copy the same set of files. Enforcing pkg/ and internal/ only across
+# the board would maybe help.
+# Original also had this copying to GOPATH, e.g.
+# COPY cmd $GOPATH/src/github.com/OpenCHAMI/power-control/v2/cmd
+# I've encountered enough Dockerfiles that just copy it to workdir
+COPY cmd cmd
+COPY api api
+COPY internal internal
+COPY go.mod go.mod
+COPY go.sum go.sum
+
+# TODO
+# These are more for the final image. Unsure if we need them for build.
+# At worst they're just some extra dead weight, pruning them later is easy, and it's not like we really care about the size of the build image
+COPY configs configs
+COPY scripts scripts
+COPY migrations migrations
+
+# Build
+ARG CGO_ENABLED
+
+RUN mkdir bin
+
+RUN CGO_ENABLED="${CGO_ENABLED}" GOOS=linux GOARCH="${TARGETARCH}" CC="${CC}" GO111MODULE=on go build -v -o bin/power-control ./cmd/power-control
+
+### release image
+# TODO seems kinda off that we don't pin wolfi or tini, but whatever
+FROM chainguard/wolfi-base:latest AS main
+
+RUN set -ex \
+    && apk update \
+    && apk add --no-cache tini \
+    && rm -rf /var/cache/apk/*  \
+    && rm -rf /tmp/*
+
+WORKDIR /
+COPY --from=builder /workspace/bin/power-control /usr/local/bin/
+COPY configs configs
+COPY migrations migrations
+
+#nobody 65534:65534
+USER 65534:65534
+
+CMD /usr/local/bin/power-control
+
+ENTRYPOINT ["/sbin/tini", "--"]

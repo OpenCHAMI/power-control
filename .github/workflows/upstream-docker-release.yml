@@ -1,0 +1,43 @@
+name: Build images and release if tagged
+run-name: Build images ${{ startsWith(github.ref, 'refs/tags/v') && 'and release' || 'and publish preview image' }}
+
+on:
+  pull_request:
+    # https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request
+    # and https://docs.github.com/en/webhooks/webhook-events-and-payloads?actionType=synchronize#pull_request
+    # can probably combine with a caller to filter on label following
+    # https://stackoverflow.com/questions/62325286/run-github-actions-when-pull-requests-have-a-specific-label
+    # This saves on Actions costs for PRs that don't really need a preview image (anything that's just CI changes, smaller code changes, etc.)
+    # However, doing that sucht that subsequent build jobs can run still for main branch and tags (which have no labels ever)
+    # is kinda annoying condition-wise. We can maybe use a prelim step that has some simple "if PR event, if label: true, else: false || if other event: true" logic,
+    # require it for the build steps, and proceed only if it's successful?
+    types: [opened, synchronize]
+  push:
+    branches:
+      - 'main'
+    tags:
+      - 'v*'
+
+permissions: write-all # Necessary for the generate-build-provenance action with containers
+
+jobs:
+  image:
+    name: Build Image
+    uses: OpenCHAMI/github-actions/.github/workflows/go-build-release.yml@v3.3
+    with:
+      fetch-depth: 1
+      registry-name: ghcr.io/openchami/pcs
+      cgo-enabled: true
+      platforms: "linux/amd64"
+      docker-file: "Dockerfile.build"
+  image_arm:
+    name: Build ARM Image
+    uses: OpenCHAMI/github-actions/.github/workflows/go-build-release.yml@v3.3
+    with:
+      fetch-depth: 1
+      registry-name: ghcr.io/openchami/pcs
+      cgo-enabled: true
+      additional-env-vars: |
+        CC=aarch64-linux-gnu-gcc
+      platforms: "linux/arm64"
+      docker-file: "Dockerfile.build"
