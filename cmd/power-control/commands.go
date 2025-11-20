@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -47,7 +48,7 @@ func createPostgresInitCommand(postgres *storage.PostgresConfig, schema *schemaC
 }
 
 // createRootCommand creates the root command power-control command
-func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig) *cobra.Command {
+func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2 *oauth2Config) *cobra.Command {
 	// root command to run PCS and parent the Postgres initialization command
 	rootCommand := &cobra.Command{
 		Use:   "power-control",
@@ -61,10 +62,37 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 				cmd.Usage()
 				os.Exit(1)
 			}
+
+			// Validate OAuth2 configuration - either all or nothing
+			if oauth2 != nil {
+				oauth2Provided := []bool{
+					oauth2.clientID != "",
+					oauth2.clientSecret != "",
+					oauth2.tokenURL != "",
+					len(oauth2.scopes) > 0,
+				}
+
+				// All
+				allProvided := !slices.Contains(oauth2Provided, false)
+
+				// Nothing
+				noneProvided := !slices.Contains(oauth2Provided, true)
+
+				if !allProvided && !noneProvided {
+					fmt.Fprintln(os.Stderr, "Error: Incomplete OAuth2 configuration, provide all OAuth2 flags (oauth2-client-id, oauth2-client-secret, oauth2-token-url and oauth2-scopes).")
+					cmd.Usage()
+					os.Exit(1)
+				}
+			}
 		},
 
 		Run: func(cmd *cobra.Command, args []string) {
-			runPCS(pcs, etcd, postgres)
+			// If OAuth2 config is empty, set to nil
+			if oauth2 != nil && oauth2.clientID == "" {
+				oauth2 = nil
+			}
+
+			runPCS(pcs, etcd, postgres, oauth2)
 		},
 	}
 
@@ -89,6 +117,12 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 
 	// JWKS URL flag
 	rootCommand.Flags().StringVar(&jwksURL, "jwks-url", "", "Set the JWKS URL to fetch public key for validation")
+
+	// OAuth2 flags
+	rootCommand.Flags().StringVar(&oauth2.clientID, "oauth2-client-id", "", "OAuth2 client ID")
+	rootCommand.Flags().StringVar(&oauth2.clientSecret, "oauth2-client-secret", "", "OAuth2 client secret")
+	rootCommand.Flags().StringVar(&oauth2.tokenURL, "oauth2-token-url", "", "OAuth2 token endpoint URL")
+	rootCommand.Flags().StringSliceVar(&oauth2.scopes, "oauth2-scopes", []string{}, "OAuth2 scopes (comma-separated)")
 
 	// Postgres flags
 	rootCommand.PersistentFlags().StringVarP(&postgres.Host, "postgres-host", "", postgres.Host, "Postgres host as IP address or name")
@@ -142,6 +176,21 @@ func parseFlagEnvVar(flag *pflag.Flag) error {
 			_, err = strconv.Atoi(envVarValue)
 		case "uint":
 			_, err = strconv.ParseUint(envVarValue, 10, 64)
+		case "stringSlice":
+			// StringSlice flags expect comma or space-separated values
+			// Split by both comma and space
+			values := strings.FieldsFunc(envVarValue, func(r rune) bool {
+				return r == ',' || r == ' '
+			})
+			for _, v := range values {
+				trimmed := strings.TrimSpace(v)
+				if trimmed != "" {
+					flag.Value.Set(trimmed)
+				}
+			}
+
+			// Return here to avoid overwriting the value again below
+			return nil
 		default:
 			err = fmt.Errorf("unsupported flag type: %s", flag.Value.Type())
 		}
