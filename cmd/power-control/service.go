@@ -397,9 +397,9 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, 
 
 	//DOMAIN CONFIGURATION
 	var domainGlobals domain.DOMAIN_GLOBALS
-	domainGlobals.NewGlobals(&BaseTRSTask, &TLOC_rf, &TLOC_svc, rfClient, svcClient,
-		rfClientLock, &Running, &DSP, &HSM, pcs.vaultEnabled,
-		&CS, &DLOCK, pcs.maxNumCompleted, pcs.expireTimeMins, podName)
+	domainGlobals.NewGlobals(&BaseTRSTask, TLOC_rf, TLOC_svc, rfClient, svcClient,
+		rfClientLock, &Running, DSP, HSM, pcs.vaultEnabled,
+		CS, DLOCK, pcs.maxNumCompleted, pcs.expireTimeMins, podName)
 
 	//Wait for vault PKI to respond for CA bundle.  Once this happens, re-do
 	//the globals.  This goroutine will run forever checking if the CA trust
@@ -461,7 +461,7 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, 
 				prevCaChain = caChain
 
 				//update RF tloc and rfclient to the global areas! //TODO im not sure what part of this code is still needed; im guessing part of it at least!
-				domainGlobals.RFTloc = &TLOC_rf
+				domainGlobals.RFTloc = TLOC_rf
 				domainGlobals.RFHttpClient = rfClient
 				//hsmGlob.RFTloc = &TLOC_rf
 				//hsmGlob.RFHttpClient = rfClient
