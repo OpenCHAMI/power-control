@@ -177,19 +177,11 @@ func parseFlagEnvVar(flag *pflag.Flag) error {
 		case "uint":
 			_, err = strconv.ParseUint(envVarValue, 10, 64)
 		case "stringSlice":
-			// StringSlice flags expect comma or space-separated values
-			// Split by both comma and space
-			values := strings.FieldsFunc(envVarValue, func(r rune) bool {
-				return r == ',' || r == ' '
-			})
-			for _, v := range values {
-				trimmed := strings.TrimSpace(v)
-				if trimmed != "" {
-					flag.Value.Set(trimmed)
-				}
+			// StringSlice expects a single value that may contain comma-separated items.
+			err = flag.Value.Set(envVarValue)
+			if err != nil {
+				return envVarError(envVarName, envVarValue, flag.Value.Type())
 			}
-
-			// Return here to avoid overwriting the value again below
 			return nil
 		default:
 			err = fmt.Errorf("unsupported flag type: %s", flag.Value.Type())
