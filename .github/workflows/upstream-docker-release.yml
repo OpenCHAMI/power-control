@@ -27,7 +27,7 @@ jobs:
     with:
       fetch-depth: 1
       registry-name: ghcr.io/openchami/pcs
-      cgo-enabled: true
+      cgo-enabled: 1
       platforms: "linux/amd64"
       docker-file: "Dockerfile.build"
   image_arm:
