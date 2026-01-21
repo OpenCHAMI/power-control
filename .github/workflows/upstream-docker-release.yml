@@ -36,7 +36,7 @@ jobs:
     with:
       fetch-depth: 1
       registry-name: ghcr.io/openchami/pcs
-      cgo-enabled: true
+      cgo-enabled: 1
       additional-env-vars: |
         CC=aarch64-linux-gnu-gcc
       platforms: "linux/arm64"
