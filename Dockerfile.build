@@ -19,6 +19,11 @@ RUN printf "Building for TARGETPLATFORM=${TARGETPLATFORM}" \
     && printf ", TARGETVARIANT=${TARGETVARIANT} \n" \
     && printf "With 'uname -s': $(uname -s) and 'uname -m': $(uname -m)"
 
+# Install cross-compilation dependencies
+RUN apt-get update && \
+    apt-get install -y g++-aarch64-linux-gnu && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /workspace
 
 # TODO
@@ -47,7 +52,13 @@ ARG CGO_ENABLED
 
 RUN mkdir bin
 
-RUN CGO_ENABLED="${CGO_ENABLED}" GOOS=linux GOARCH="${TARGETARCH}" CC="${CC}" GO111MODULE=on go build -v -o bin/power-control ./cmd/power-control
+# Use shell parameter expansion to add -ldflags if CC is set to specify the external linker
+RUN CGO_ENABLED="${CGO_ENABLED}" \
+    GOOS=linux \
+    GOARCH="${TARGETARCH}" \
+    CC="${CC}" \
+    GO111MODULE=on \
+    go build ${CC:+-ldflags="-extld=$CC"} -v -o bin/power-control ./cmd/power-control
 
 ### release image
 # TODO seems kinda off that we don't pin wolfi or tini, but whatever
