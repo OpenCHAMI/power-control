@@ -78,6 +78,6 @@ COPY migrations migrations
 #nobody 65534:65534
 USER 65534:65534
 
-CMD /usr/local/bin/power-control
-
 ENTRYPOINT ["/sbin/tini", "--"]
+
+CMD ["/usr/local/bin/power-control"]
