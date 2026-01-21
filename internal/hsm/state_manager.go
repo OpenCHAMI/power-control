@@ -35,6 +35,7 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base/v2"
+	rf "github.com/OpenCHAMI/smd/v2/pkg/redfish"
 	reservation "github.com/OpenCHAMI/smd/v2/pkg/service-reservations"
 	"github.com/OpenCHAMI/smd/v2/pkg/sm"
 	"github.com/sirupsen/logrus"
@@ -469,10 +470,16 @@ func (b *HSMv2) FillComponentEndpointData(hd map[string]*HsmData) error {
 			case sm.CompEPTypeOutlet: //PDU outlet/power connector
 				hd[comp.ID].RfFQDN = comp.RfEndpointFQDN
 				hd[comp.ID].PowerStatusURI = comp.OdataID
-				if comp.RedfishOutletInfo != nil &&
-					comp.RedfishOutletInfo.Actions != nil {
-					hd[comp.ID].PowerActionURI = comp.RedfishOutletInfo.Actions.PowerControl.Target
-					hd[comp.ID].AllowableActions = comp.RedfishOutletInfo.Actions.PowerControl.AllowableValues
+				if comp.RedfishOutletInfo != nil {
+					outInfo, ok := comp.RedfishOutletInfo.(*rf.ComponentOutletInfo)
+					if !ok {
+						b.HSMGlobals.Logger.Warnf("Unexpected RedfishOutletInfo type for '%s': %T", comp.ID, comp.RedfishOutletInfo)
+						break
+					}
+					if outInfo.Actions != nil {
+						hd[comp.ID].PowerActionURI = outInfo.Actions.PowerControl.Target
+						hd[comp.ID].AllowableActions = outInfo.Actions.PowerControl.AllowableValues
+					}
 				}
 
 			default:
