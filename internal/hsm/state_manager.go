@@ -112,7 +112,15 @@ func (b *HSMv2) Init(globals *HSM_GLOBALS) error {
 		logy.SetFormatter(Formatter)
 
 		b.HSMGlobals.Reservation = &reservation.Production{}
-		b.HSMGlobals.Reservation.InitInstance(b.HSMGlobals.SMUrl, "", 1, logy, svcName)
+
+		// Select the HTTP client to use
+		httpClient := b.HSMGlobals.SVCHttpClient.InsecureClient
+		if b.HSMGlobals.SVCHttpClient.SecureClient != nil {
+			httpClient = b.HSMGlobals.SVCHttpClient.SecureClient
+		}
+
+		// Initialize the reservation production instance with our http client, so  bearer tokens are added to requests
+		b.HSMGlobals.Reservation.InitWithHTTPClient(b.HSMGlobals.SMUrl, "", 1, logy, svcName, httpClient)
 	}
 
 	//Make sure certain things are set up
