@@ -64,9 +64,9 @@ func createProviders(t *testing.T, settings *EtcdTestSettings) (StorageProvider,
 		t.Errorf("Storage Init() failed: %v", err)
 	}
 
-	err = ds.Init(nil)
+	ds.Init(nil)
 	if err != nil {
-		t.Errorf("DistributedLockProvider Init() failed: %v", err)
+		t.Errorf("DistLock Init() failed: %v", err)
 	}
 
 	if e, ok := ms.(*ETCDStorage); ok {
