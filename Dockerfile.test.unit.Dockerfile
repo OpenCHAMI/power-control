@@ -48,6 +48,9 @@ ENV CRAY_VAULT_AUTH_PATH="auth/token/create"
 ENV CRAY_VAULT_ROLE_FILE="/go/configs/namespace"
 ENV CRAY_VAULT_JWT_FILE="/go/configs/token"
 
+ENV PCS_JAWS_MONITOR="true"
+ENV PCS_JAWS_MONITOR_INTERVAL="20"
+
 RUN go env -w GO111MODULE=auto
 
 COPY cmd $GOPATH/src/github.com/OpenCHAMI/power-control/v2/cmd
