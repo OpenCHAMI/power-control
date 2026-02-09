@@ -132,9 +132,9 @@ func (ts *Transitions_TS) SetupSuite() {
 	HSM.Init(&hsmGlob)
 	ts.hsmURL = hsmGlob.SMUrl
 
-	domainGlobals.NewGlobals(&BaseTRSTask, &TLOC_rf, &TLOC_svc, nil, svcClient,
-		rfClientLock, &Running, &DSP, &HSM, enableVault, &CS,
-		&DLOCK, 20000, 1440, "transitions_test-pod")
+	domainGlobals.NewGlobals(&BaseTRSTask, TLOC_rf, TLOC_svc, nil, svcClient,
+		rfClientLock, &Running, DSP, HSM, enableVault, CS,
+		DLOCK, 20000, 1440, "transitions_test-pod")
 	Init(&domainGlobals)
 
 	// Calling PowerStatusMonitorInit() is required to initialize the
@@ -184,7 +184,7 @@ func (ts *Transitions_TS) TestDoTransition() {
 		},
 	}
 	testTransition, _ = model.ToTransition(testParams, GLOB.ExpireTimeMins)
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransition(testTransition)
 	doTransition(testTransition.TransitionID)
 	resultsPb = GetTransition(testTransition.TransitionID)
 	results = resultsPb.Obj.(model.TransitionResp)
@@ -207,7 +207,7 @@ func (ts *Transitions_TS) TestDoTransition() {
 		},
 	}
 	testTransition, _ = model.ToTransition(testParams, GLOB.ExpireTimeMins)
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransition(testTransition)
 	doTransition(testTransition.TransitionID)
 	resultsPb = GetTransition(testTransition.TransitionID)
 	results = resultsPb.Obj.(model.TransitionResp)
@@ -237,7 +237,7 @@ func (ts *Transitions_TS) TestDoTransition() {
 		},
 	}
 	testTransition, _ = model.ToTransition(testParams, GLOB.ExpireTimeMins)
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransition(testTransition)
 	doTransition(testTransition.TransitionID)
 	resultsPb = GetTransition(testTransition.TransitionID)
 	results = resultsPb.Obj.(model.TransitionResp)
@@ -260,7 +260,7 @@ func (ts *Transitions_TS) TestDoTransition() {
 		},
 	}
 	testTransition, _ = model.ToTransition(testParams, GLOB.ExpireTimeMins)
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransition(testTransition)
 	go doTransition(testTransition.TransitionID)
 	// Wait for completion
 	for i := 0; i < 60; i++ {
@@ -310,26 +310,26 @@ func (ts *Transitions_TS) TestDoTransition() {
 	task.Operation = model.Operation_Off
 	task.State = model.TaskState_Waiting
 	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
-	(*GLOB.DSP).StoreTransitionTask(task)
+	GLOB.DSP.StoreTransitionTask(task)
 	task = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task.Xname = "x0c0s2b0n0"
 	task.Operation = model.Operation_Off
 	task.State = model.TaskState_Sending
 	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
-	(*GLOB.DSP).StoreTransitionTask(task)
+	GLOB.DSP.StoreTransitionTask(task)
 	task = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task.Xname = "x0c0s1"
 	task.Operation = model.Operation_Init
 	task.State = model.TaskState_GatherData
 	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
-	(*GLOB.DSP).StoreTransitionTask(task)
+	GLOB.DSP.StoreTransitionTask(task)
 	task = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task.Xname = "x0c0s2"
 	task.Operation = model.Operation_Init
 	task.State = model.TaskState_GatherData
 	testTransition.TaskIDs = append(testTransition.TaskIDs, task.TaskID)
-	(*GLOB.DSP).StoreTransitionTask(task)
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransitionTask(task)
+	GLOB.DSP.StoreTransition(testTransition)
 	go doTransition(testTransition.TransitionID)
 	// Wait for completion
 	for i := 0; i < 60; i++ {
@@ -381,7 +381,7 @@ func (ts *Transitions_TS) TestAbortTransitionID() {
 	}
 	testTransition, _ = model.ToTransition(testParams, GLOB.ExpireTimeMins)
 	testTransition.Status = model.TransitionStatusCompleted
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransition(testTransition)
 	resultsPb = AbortTransitionID(testTransition.TransitionID)
 	ts.Assert().Equal(http.StatusBadRequest, resultsPb.StatusCode,
 		"Test 2 failed with status code, %d. Expected %d",
@@ -398,7 +398,7 @@ func (ts *Transitions_TS) TestAbortTransitionID() {
 		},
 	}
 	testTransition, _ = model.ToTransition(testParams, GLOB.ExpireTimeMins)
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransition(testTransition)
 	resultsPb = AbortTransitionID(testTransition.TransitionID)
 	ts.Assert().Equal(http.StatusAccepted, resultsPb.StatusCode,
 		"Test 3 failed with status code, %d. Expected %d",
@@ -450,7 +450,7 @@ func (ts *Transitions_TS) TestCheckAbort() {
 		},
 	}
 	testTransition, _ = model.ToTransition(testParams, GLOB.ExpireTimeMins)
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransition(testTransition)
 	resultsAbort, err = checkAbort(testTransition)
 	ts.Assert().Empty(err,
 		"Test 2 failed with error, %v. Expected %s",
@@ -464,7 +464,7 @@ func (ts *Transitions_TS) TestCheckAbort() {
 	/////////
 	t.Logf("Test 3 - checkAbort() Exists, w\\ abort.")
 	testTransition.Status = model.TransitionStatusAbortSignaled
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransition(testTransition)
 	resultsAbort, err = checkAbort(testTransition)
 	ts.Assert().Empty(err,
 		"Test 3 failed with error, %v. Expected %s",
@@ -501,21 +501,21 @@ func (ts *Transitions_TS) TestDoAbort() {
 	task1 := model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task1.Xname = "x0c0s1b0n0"
 	task1.Status = model.TransitionTaskStatusNew
-	(*GLOB.DSP).StoreTransitionTask(task1)
+	GLOB.DSP.StoreTransitionTask(task1)
 	task2 := model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task2.Xname = "x0c0s2b0n0"
 	task2.Status = model.TransitionTaskStatusInProgress
-	(*GLOB.DSP).StoreTransitionTask(task2)
+	GLOB.DSP.StoreTransitionTask(task2)
 	task3 := model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task3.Xname = "x0c0s1"
 	task3.Status = model.TransitionTaskStatusFailed
 	task3.Error = "My Error"
 	task3.StatusDesc = "My description"
-	(*GLOB.DSP).StoreTransitionTask(task3)
+	GLOB.DSP.StoreTransitionTask(task3)
 	task4 := model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task4.Xname = "x0c0s2"
 	task4.Status = model.TransitionTaskStatusSucceeded
-	(*GLOB.DSP).StoreTransitionTask(task4)
+	GLOB.DSP.StoreTransitionTask(task4)
 	testXnameMap := map[string]*TransitionComponent{
 		"x0c0s1b0n0": {Task: &task1},
 		"x0c0s2b0n0": {Task: &task2},
@@ -564,10 +564,10 @@ func (ts *Transitions_TS) TestSequenceComponents() {
 		},
 	}
 	testTransition, _ = model.ToTransition(testParams, GLOB.ExpireTimeMins)
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransition(testTransition)
 	xnames := []string{"x0c0s1b0n0", "x0c0s2b0n0", "x0c0s1", "x0c0s2"}
 	pStates, _, _ := getPowerStateHierarchy(xnames)
-	hsmData, _ := (*GLOB.HSM).FillHSMData(xnames)
+	hsmData, _ := GLOB.HSM.FillHSMData(xnames)
 	task1 := model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task1.Xname = "x0c0s1b0n0"
 	pState1 := pStates["x0c0s1b0n0"]
@@ -576,7 +576,7 @@ func (ts *Transitions_TS) TestSequenceComponents() {
 	for _, action := range hsmData["x0c0s1b0n0"].AllowableActions {
 		actions1[strings.ToLower(action)] = action
 	}
-	(*GLOB.DSP).StoreTransitionTask(task1)
+	GLOB.DSP.StoreTransitionTask(task1)
 	task2 := model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task2.Xname = "x0c0s2b0n0"
 	pState2 := pStates["x0c0s2b0n0"]
@@ -585,7 +585,7 @@ func (ts *Transitions_TS) TestSequenceComponents() {
 	for _, action := range hsmData["x0c0s2b0n0"].AllowableActions {
 		actions2[strings.ToLower(action)] = action
 	}
-	(*GLOB.DSP).StoreTransitionTask(task2)
+	GLOB.DSP.StoreTransitionTask(task2)
 	task3 := model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task3.Xname = "x0c0s1"
 	pState3 := pStates["x0c0s1"]
@@ -594,7 +594,7 @@ func (ts *Transitions_TS) TestSequenceComponents() {
 	for _, action := range hsmData["x0c0s1"].AllowableActions {
 		actions3[strings.ToLower(action)] = action
 	}
-	(*GLOB.DSP).StoreTransitionTask(task3)
+	GLOB.DSP.StoreTransitionTask(task3)
 	task4 := model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task4.Xname = "x0c0s2"
 	pState4 := pStates["x0c0s2"]
@@ -603,7 +603,7 @@ func (ts *Transitions_TS) TestSequenceComponents() {
 	for _, action := range hsmData["x0c0s2"].AllowableActions {
 		actions4[strings.ToLower(action)] = action
 	}
-	(*GLOB.DSP).StoreTransitionTask(task4)
+	GLOB.DSP.StoreTransitionTask(task4)
 
 	testXnameMap = map[string]*TransitionComponent{
 		"x0c0s1b0n0": {
@@ -672,10 +672,10 @@ func (ts *Transitions_TS) TestSequenceComponents() {
 	}
 	testTransition, _ = model.ToTransition(testParams, GLOB.ExpireTimeMins)
 	testTransition.Status = model.TransitionStatusInProgress
-	(*GLOB.DSP).StoreTransition(testTransition)
+	GLOB.DSP.StoreTransition(testTransition)
 	xnames = []string{"x0c0s1b0n0", "x0c0s2b0n0", "x0c0s1", "x0c0s2"}
 	pStates, _, _ = getPowerStateHierarchy(xnames)
-	hsmData, _ = (*GLOB.HSM).FillHSMData(xnames)
+	hsmData, _ = GLOB.HSM.FillHSMData(xnames)
 	task1 = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task1.Xname = "x0c0s1b0n0"
 	task1.Status = model.TransitionTaskStatusInProgress
@@ -687,7 +687,7 @@ func (ts *Transitions_TS) TestSequenceComponents() {
 	for _, action := range hsmData["x0c0s1b0n0"].AllowableActions {
 		actions1[strings.ToLower(action)] = action
 	}
-	(*GLOB.DSP).StoreTransitionTask(task1)
+	GLOB.DSP.StoreTransitionTask(task1)
 	task2 = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task2.Xname = "x0c0s2b0n0"
 	task2.Operation = model.Operation_Off
@@ -698,7 +698,7 @@ func (ts *Transitions_TS) TestSequenceComponents() {
 	for _, action := range hsmData["x0c0s2b0n0"].AllowableActions {
 		actions2[strings.ToLower(action)] = action
 	}
-	(*GLOB.DSP).StoreTransitionTask(task2)
+	GLOB.DSP.StoreTransitionTask(task2)
 	task3 = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task3.Xname = "x0c0s1"
 	task3.Operation = model.Operation_Init
@@ -709,7 +709,7 @@ func (ts *Transitions_TS) TestSequenceComponents() {
 	for _, action := range hsmData["x0c0s1"].AllowableActions {
 		actions3[strings.ToLower(action)] = action
 	}
-	(*GLOB.DSP).StoreTransitionTask(task3)
+	GLOB.DSP.StoreTransitionTask(task3)
 	task4 = model.NewTransitionTask(testTransition.TransitionID, testTransition.Operation)
 	task4.Xname = "x0c0s2"
 	task4.Operation = model.Operation_Init
@@ -720,7 +720,7 @@ func (ts *Transitions_TS) TestSequenceComponents() {
 	for _, action := range hsmData["x0c0s2"].AllowableActions {
 		actions4[strings.ToLower(action)] = action
 	}
-	(*GLOB.DSP).StoreTransitionTask(task4)
+	GLOB.DSP.StoreTransitionTask(task4)
 
 	testXnameMap = map[string]*TransitionComponent{
 		"x0c0s1b0n0": {
@@ -799,7 +799,7 @@ func (ts *Transitions_TS) TestGetPowerSupplies() {
 		ManagementState: model.ManagementStateFilter_available.String(),
 		LastUpdated:     time.Now(),
 	}
-	(*GLOB.DSP).StorePowerStatus(connectorPowerStatus)
+	GLOB.DSP.StorePowerStatus(connectorPowerStatus)
 
 	results = getPowerSupplies(&testParams)
 
@@ -834,7 +834,7 @@ func (ts *Transitions_TS) TestGetPowerSupplies() {
 		ManagementState: model.ManagementStateFilter_available.String(),
 		LastUpdated:     time.Now(),
 	}
-	(*GLOB.DSP).StorePowerStatus(connectorPowerStatus)
+	GLOB.DSP.StorePowerStatus(connectorPowerStatus)
 
 	results = getPowerSupplies(&testParams)
 

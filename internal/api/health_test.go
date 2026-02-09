@@ -112,9 +112,9 @@ func setupGlobals(suite *Models_TS) {
 	}
 
 	var domainGlobals domain.DOMAIN_GLOBALS
-	domainGlobals.NewGlobals(nil, &TLOC_rf, nil, nil, nil,
-		nil, &Running, &DSP, &HSM, (ve != ""),
-		&CS, &DLOCK, 20000, 1440, "health_test-pod")
+	domainGlobals.NewGlobals(nil, TLOC_rf, nil, nil, nil,
+		nil, &Running, DSP, HSM, (ve != ""),
+		CS, DLOCK, 20000, 1440, "health_test-pod")
 	domain.Init(&domainGlobals)
 
 }

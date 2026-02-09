@@ -116,7 +116,7 @@ var PowerSequenceFull = []PowerSeqElem{
 func GetTransition(transitionID uuid.UUID) (pb model.Passback) {
 	var tasks []model.TransitionTask
 	// Get the transition
-	transition, _, err := (*GLOB.DSP).GetTransition(transitionID)
+	transition, _, err := GLOB.DSP.GetTransition(transitionID)
 	if err != nil {
 		if strings.Contains(err.Error(), "does not exist") {
 			pb = model.BuildErrorPassback(http.StatusNotFound, err)
@@ -135,7 +135,7 @@ func GetTransition(transitionID uuid.UUID) (pb model.Passback) {
 	// Compressed transitions don't have tasks anymore. No need to look them up.
 	if !transition.IsCompressed {
 		// Get the tasks for the transition
-		tasks, err = (*GLOB.DSP).GetAllTasksForTransition(transitionID)
+		tasks, err = GLOB.DSP.GetAllTasksForTransition(transitionID)
 		if err != nil {
 			pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
 			logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error retrieving transition tasks")
@@ -152,7 +152,7 @@ func GetTransition(transitionID uuid.UUID) (pb model.Passback) {
 
 func GetTransitionStatuses() (pb model.Passback) {
 	// Get all transitions
-	transitions, err := (*GLOB.DSP).GetAllTransitions()
+	transitions, err := GLOB.DSP.GetAllTransitions()
 	if err != nil {
 		pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
 		logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error retrieving transitions")
@@ -167,7 +167,7 @@ func GetTransitionStatuses() (pb model.Passback) {
 		var tasks []model.TransitionTask
 		// Compressed transitions don't have tasks anymore. No need to look them up.
 		if !transition.IsCompressed {
-			tasks, err = (*GLOB.DSP).GetAllTasksForTransition(transition.TransitionID)
+			tasks, err = GLOB.DSP.GetAllTasksForTransition(transition.TransitionID)
 			if err != nil {
 				pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
 				logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error retrieving transition tasks")
@@ -188,7 +188,7 @@ func GetTransitionStatuses() (pb model.Passback) {
 func AbortTransitionID(transitionID uuid.UUID) (pb model.Passback) {
 	for retry := 0; retry < 3; retry++ {
 		// Get the transition
-		transition, transitionFirstPage, err := (*GLOB.DSP).GetTransition(transitionID)
+		transition, transitionFirstPage, err := GLOB.DSP.GetTransition(transitionID)
 		if err != nil {
 			if strings.Contains(err.Error(), "does not exist") {
 				pb = model.BuildErrorPassback(http.StatusNotFound, err)
@@ -215,7 +215,7 @@ func AbortTransitionID(transitionID uuid.UUID) (pb model.Passback) {
 		}
 		transition.Status = model.TransitionStatusAbortSignaled
 		// Use test and set to prevent overwriting another thread's store operation.
-		ok, err := (*GLOB.DSP).TASTransition(transition, transitionFirstPage)
+		ok, err := GLOB.DSP.TASTransition(transition, transitionFirstPage)
 		if err != nil {
 			pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
 			logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error storing new transition")
@@ -237,7 +237,7 @@ func AbortTransitionID(transitionID uuid.UUID) (pb model.Passback) {
 func TriggerTransition(transition model.Transition) (pb model.Passback) {
 
 	// Store transition
-	err := (*GLOB.DSP).StoreTransition(transition)
+	err := GLOB.DSP.StoreTransition(transition)
 	if err != nil {
 		pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
 		logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error storing new transition")
@@ -270,7 +270,7 @@ func doTransition(transitionID uuid.UUID) {
 
 	fname := "doTransition"
 
-	tr, _, err := (*GLOB.DSP).GetTransition(transitionID)
+	tr, _, err := GLOB.DSP.GetTransition(transitionID)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Cannot retrieve transition, cannot generate tasks")
 		return
@@ -378,7 +378,7 @@ func doTransition(transitionID uuid.UUID) {
 				comp.Task.Error = "Missing xname"
 			}
 			comp.Task.StatusDesc = "Failed to achieve transition"
-			err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+			err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 			}
@@ -400,7 +400,7 @@ func doTransition(transitionID uuid.UUID) {
 	// o Get the component state and ComponentEndpoint data from HSM.
 	///////////////////////////////////////////////////////////////////////////
 
-	hsmData, err := (*GLOB.HSM).FillHSMData(xnameHierarchy)
+	hsmData, err := GLOB.HSM.FillHSMData(xnameHierarchy)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error retrieving HSM data")
 		// Failed to get data from HSM. Fail everything.
@@ -418,7 +418,7 @@ func doTransition(transitionID uuid.UUID) {
 			comp.Task.Status = model.TransitionTaskStatusFailed
 			comp.Task.Error = "Error retrieving HSM data"
 			comp.Task.StatusDesc = "Failed to achieve transition"
-			err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+			err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 			}
@@ -444,7 +444,7 @@ func doTransition(transitionID uuid.UUID) {
 					comp.Task.Status = model.TransitionTaskStatusFailed
 					comp.Task.Error = "Xname not found in HSM"
 					comp.Task.StatusDesc = "Failed to achieve transition"
-					err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+					err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 					if err != nil {
 						logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 					}
@@ -456,7 +456,7 @@ func doTransition(transitionID uuid.UUID) {
 	///////////////////////////////////////////////////////////////////////////
 	// o Get the power maps data from HSM.
 	///////////////////////////////////////////////////////////////////////////
-	err = (*GLOB.HSM).FillPowerMapData(hsmData)
+	err = GLOB.HSM.FillPowerMapData(hsmData)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error retrieving HSM power maps data")
 		// Failed to get data from HSM. Fail everything.
@@ -474,7 +474,7 @@ func doTransition(transitionID uuid.UUID) {
 			comp.Task.Status = model.TransitionTaskStatusFailed
 			comp.Task.Error = "Error retrieving HSM data"
 			comp.Task.StatusDesc = "Failed to achieve transition"
-			err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+			err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 			}
@@ -526,7 +526,7 @@ func doTransition(transitionID uuid.UUID) {
 				task.Xname = switchXname
 				task.StatusDesc = "Gathering data"
 				tr.TaskIDs = append(tr.TaskIDs, task.TaskID)
-				err = (*GLOB.DSP).StoreTransitionTask(task)
+				err = GLOB.DSP.StoreTransitionTask(task)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 				}
@@ -569,7 +569,7 @@ func doTransition(transitionID uuid.UUID) {
 
 	// ReserveComponents() will validate any deputy keys and reserve any
 	// components with an invalid deputy key or without a deputy key.
-	resData, err := (*GLOB.HSM).ReserveComponents(reservationData)
+	resData, err := GLOB.HSM.ReserveComponents(reservationData)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error acquiring reservations")
 		// An error occurred while reserving components. This does not include partial failure. Fail everything.
@@ -581,7 +581,7 @@ func doTransition(transitionID uuid.UUID) {
 			comp.Task.Status = model.TransitionTaskStatusFailed
 			comp.Task.Error = err.Error()
 			comp.Task.StatusDesc = "Error acquiring reservations"
-			err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+			err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 			}
@@ -642,7 +642,7 @@ func doTransition(transitionID uuid.UUID) {
 					}
 				}
 				failDependentComps(xnameMap, powerAction, comp.Task.Xname, depErrMsg)
-				err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+				err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 				}
@@ -651,13 +651,13 @@ func doTransition(transitionID uuid.UUID) {
 				comp := xnameMap[res.XName]
 				comp.Task.ReservationKey = reservation.ReservationKey
 				comp.Task.DeputyKey = reservation.DeputyKey
-				err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+				err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 				}
 			}
 		}
-		defer (*GLOB.HSM).ReleaseComponents(reservationData)
+		defer GLOB.HSM.ReleaseComponents(reservationData)
 	}
 
 	///////////////////////////////////////////////////////////////////////////
@@ -715,7 +715,7 @@ func doTransition(transitionID uuid.UUID) {
 		}
 
 		// Check reservations are good
-		err := (*GLOB.HSM).CheckDeputyKeys(reservationData)
+		err := GLOB.HSM.CheckDeputyKeys(reservationData)
 		if err != nil {
 			// TODO: Couldn't reach HSM. Retry?
 			logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Couldn't check reservations")
@@ -734,7 +734,7 @@ func doTransition(transitionID uuid.UUID) {
 					comp.Task.StatusDesc = "Failed to achieve transition"
 					depErrMsg := fmt.Sprintf("Reservation expired for dependency, %s.", comp.Task.Xname)
 					failDependentComps(xnameMap, powerAction, comp.Task.Xname, depErrMsg)
-					err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+					err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 					if err != nil {
 						logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 					}
@@ -751,7 +751,7 @@ func doTransition(transitionID uuid.UUID) {
 
 		// Create TRS task list
 		trsTaskMap := make(map[uuid.UUID]*TransitionComponent)
-		trsTaskList := (*GLOB.RFTloc).CreateTaskList(GLOB.BaseTRSTask, len(compList))
+		trsTaskList := GLOB.RFTloc.CreateTaskList(GLOB.BaseTRSTask, len(compList))
 		trsTaskIdx := 0
 		for _, comp := range compList {
 			if comp.Task.Status == model.TransitionTaskStatusFailed {
@@ -772,7 +772,7 @@ func doTransition(transitionID uuid.UUID) {
 				comp.Task.Error = err.Error()
 				depErrMsg := fmt.Sprintf("Failed to apply transition, %s, to dependency, %s.", powerAction, comp.Task.Xname)
 				failDependentComps(xnameMap, powerAction, comp.Task.Xname, depErrMsg)
-				err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+				err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 				}
@@ -789,7 +789,7 @@ func doTransition(transitionID uuid.UUID) {
 			trsTaskList[trsTaskIdx].Request.Header.Add("HMS-Service", GLOB.BaseTRSTask.ServiceName)
 			// Vault enabled?
 			if GLOB.VaultEnabled {
-				user, pw, err := (*GLOB.CS).GetControllerCredentials(comp.PState.XName)
+				user, pw, err := GLOB.CS.GetControllerCredentials(comp.PState.XName)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Unable to get credentials for " + comp.PState.XName)
 				} // Retry credentials? Fail operation here? For now, just let it fail with empty credentials
@@ -798,7 +798,7 @@ func doTransition(transitionID uuid.UUID) {
 				}
 			}
 			trsTaskIdx++
-			err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+			err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 			}
@@ -813,7 +813,7 @@ func doTransition(transitionID uuid.UUID) {
 				len(compList), GLOB.BaseTRSTask.Timeout,
 				GLOB.PodName)
 
-			rchan, err := (*GLOB.RFTloc).Launch(&trsTaskList)
+			rchan, err := GLOB.RFTloc.Launch(&trsTaskList)
 			if err != nil {
 				logrus.Error(err)
 			}
@@ -875,18 +875,18 @@ func doTransition(transitionID uuid.UUID) {
 					comp.Task.StatusDesc = "Confirming successful transition, " + powerAction
 					comp.Task.State = model.TaskState_Waiting
 				}
-				err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+				err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 				}
 			}
-			(*GLOB.RFTloc).Close(&trsTaskList)
+			GLOB.RFTloc.Close(&trsTaskList)
 			close(rchan)
 			logger.Log.Infof("%s: Done processing BMC responses (%s)",
 				fname, GLOB.PodName)
 		} else {
 			// Free up this memory
-			(*GLOB.RFTloc).Close(&trsTaskList)
+			GLOB.RFTloc.Close(&trsTaskList)
 		}
 
 		// TRS section for getting power state for confirmation.
@@ -917,7 +917,7 @@ func doTransition(transitionID uuid.UUID) {
 				time.Sleep(15 * time.Second)
 				for trsTaskID, comp := range trsTaskMap {
 					// Get the state from ETCD
-					pState, err := (*GLOB.DSP).GetPowerStatus(comp.Task.Xname)
+					pState, err := GLOB.DSP.GetPowerStatus(comp.Task.Xname)
 					if err != nil {
 						comp.Task.Status = model.TransitionTaskStatusFailed
 						comp.Task.Error = err.Error()
@@ -929,7 +929,7 @@ func doTransition(transitionID uuid.UUID) {
 						delete(trsTaskMap, trsTaskID)
 						depErrMsg := fmt.Sprintf("Failed to confirm transition, %s, to dependency, %s.", powerAction, comp.Task.Xname)
 						failDependentComps(xnameMap, powerAction, comp.Task.Xname, depErrMsg)
-						err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+						err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 						if err != nil {
 							logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 						}
@@ -943,7 +943,7 @@ func doTransition(transitionID uuid.UUID) {
 							comp.Task.StatusDesc = "Transition confirmed, " + powerAction + ". Waiting for next transition"
 						}
 						delete(trsTaskMap, trsTaskID)
-						err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+						err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 						if err != nil {
 							logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 						}
@@ -969,7 +969,7 @@ func doTransition(transitionID uuid.UUID) {
 							comp.Task.StatusDesc = "Failed to achieve transition"
 							depErrMsg := fmt.Sprintf("Timeout waiting for transition, %s, on dependency, %s.", powerAction, comp.Task.Xname)
 							failDependentComps(xnameMap, powerAction, comp.Task.Xname, depErrMsg)
-							err = (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+							err = GLOB.DSP.StoreTransitionTask(*comp.Task)
 							if err != nil {
 								logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 							}
@@ -1003,7 +1003,7 @@ func doTransition(transitionID uuid.UUID) {
 	// o When Launch() completes, release any reservations PCS obtained for targets.
 	///////////////////////////////////////////////////////////////////////////
 
-	// (*GLOB.HSM).ReleaseComponents(reservationData) <- defered above
+	// GLOB.HSM.ReleaseComponents(reservationData) <- defered above
 
 	///////////////////////////////////////////////////////////////////////////
 	// o Once the service inst is done executing its task, "close out" the ETCD task
@@ -1024,7 +1024,7 @@ func storeTransition(tr model.Transition) (bool, error) {
 	abort := false
 	for retry := 0; retry < 3; retry++ {
 		// Get the transition
-		_, trOld, err := (*GLOB.DSP).GetTransition(tr.TransitionID)
+		_, trOld, err := GLOB.DSP.GetTransition(tr.TransitionID)
 		if err != nil {
 			if !strings.Contains(err.Error(), "does not exist") {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error getting transition")
@@ -1034,7 +1034,7 @@ func storeTransition(tr model.Transition) (bool, error) {
 		tr.LastActiveTime = time.Now()
 		if trOld.TransitionID.String() != tr.TransitionID.String() {
 			//Blank struct, do a normal store.
-			err = (*GLOB.DSP).StoreTransition(tr)
+			err = GLOB.DSP.StoreTransition(tr)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition")
 			}
@@ -1045,7 +1045,7 @@ func storeTransition(tr model.Transition) (bool, error) {
 			abort = true
 		}
 		// Use test and set to prevent overwriting another thread's store operation.
-		ok, err := (*GLOB.DSP).TASTransition(tr, trOld)
+		ok, err := GLOB.DSP.TASTransition(tr, trOld)
 		if err != nil {
 			logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition")
 		}
@@ -1061,7 +1061,7 @@ func storeTransition(tr model.Transition) (bool, error) {
 // Checks the channel for abort signals and returns true if atleast 1 was found.
 // Empties the channel if more than one was found.
 func checkAbort(tr model.Transition) (bool, error) {
-	transition, _, err := (*GLOB.DSP).GetTransition(tr.TransitionID)
+	transition, _, err := GLOB.DSP.GetTransition(tr.TransitionID)
 	if err != nil {
 		if !strings.Contains(err.Error(), "does not exist") {
 			logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error getting transition")
@@ -1089,7 +1089,7 @@ func doAbort(tr model.Transition, xnameMap map[string]*TransitionComponent) {
 			comp.Task.Status = model.TransitionTaskStatusFailed
 			comp.Task.Error = "Transition aborted"
 			comp.Task.StatusDesc = "Aborted. Last status - " + comp.Task.StatusDesc
-			err := (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+			err := GLOB.DSP.StoreTransitionTask(*comp.Task)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 			}
@@ -1112,7 +1112,7 @@ func transitionKeepAlive(transitionID uuid.UUID, cancelChan chan bool) {
 		case <-keepAlive.C:
 			for {
 				// Get the transition
-				transition, transitionOld, err := (*GLOB.DSP).GetTransition(transitionID)
+				transition, transitionOld, err := GLOB.DSP.GetTransition(transitionID)
 				if err != nil {
 					if strings.Contains(err.Error(), "does not exist") {
 						logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Transition, %s, does not exist, stopping keep alive thread", transitionID.String())
@@ -1137,7 +1137,7 @@ func transitionKeepAlive(transitionID uuid.UUID, cancelChan chan bool) {
 				// Only change the LastActiveTime
 				transition.LastActiveTime = time.Now()
 				// Use test and set to prevent overwriting another thread's store operation.
-				ok, err := (*GLOB.DSP).TASTransition(transition, transitionOld)
+				ok, err := GLOB.DSP.TASTransition(transition, transitionOld)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error storing Transition, %s, retrying...", transitionID.String())
 					continue
@@ -1177,7 +1177,7 @@ func getPowerStateHierarchy(xnames []string) (map[string]model.PowerStatusCompon
 			case xnametypes.CDUMgmtSwitch:
 				fallthrough
 			case xnametypes.CabinetPDUPowerConnector:
-				pState, err := (*GLOB.DSP).GetPowerStatus(xname)
+				pState, err := GLOB.DSP.GetPowerStatus(xname)
 				if err != nil {
 					if strings.Contains(err.Error(), "does not exist") {
 						badList = append(badList, xname)
@@ -1191,7 +1191,7 @@ func getPowerStateHierarchy(xnames []string) (map[string]model.PowerStatusCompon
 				}
 			case xnametypes.RouterModule:
 				found := false
-				pStates, err := (*GLOB.DSP).GetPowerStatusHierarchy(xname)
+				pStates, err := GLOB.DSP.GetPowerStatusHierarchy(xname)
 				if err != nil {
 					// Database error. Bail
 					return nil, nil, err
@@ -1230,7 +1230,7 @@ func setupTransitionTasks(tr *model.Transition) (map[string]*TransitionComponent
 	xnameMap := make(map[string]*TransitionComponent)
 
 	// Get any tasks that may have previously been created for our operation.
-	tasks, err := (*GLOB.DSP).GetAllTasksForTransition(tr.TransitionID)
+	tasks, err := GLOB.DSP.GetAllTasksForTransition(tr.TransitionID)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error retrieving tasks for transition, " + tr.TransitionID.String())
 	}
@@ -1304,7 +1304,7 @@ func setupTransitionTasks(tr *model.Transition) (map[string]*TransitionComponent
 			task.StatusDesc = "Failed to achieve transition"
 		}
 		tr.TaskIDs = append(tr.TaskIDs, task.TaskID)
-		err = (*GLOB.DSP).StoreTransitionTask(task)
+		err = GLOB.DSP.StoreTransitionTask(task)
 		if err != nil {
 			logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 		}
@@ -1356,7 +1356,7 @@ func sequenceComponents(operation model.Operation, xnameMap map[string]*Transiti
 			comp.Task.Status = model.TransitionTaskStatusUnsupported
 			comp.Task.StatusDesc = fmt.Sprintf("Component does not support the specified transition operation, %s", operation.String())
 			comp.Task.Error = "Unsupported for transition operation"
-			err := (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+			err := GLOB.DSP.StoreTransitionTask(*comp.Task)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 			}
@@ -1560,7 +1560,7 @@ func sequenceComponents(operation model.Operation, xnameMap map[string]*Transiti
 			}
 			resData = append(resData, res)
 		}
-		err := (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+		err := GLOB.DSP.StoreTransitionTask(*comp.Task)
 		if err != nil {
 			logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 		}
@@ -1676,7 +1676,7 @@ func failDependentComps(xnameMap map[string]*TransitionComponent, powerAction st
 				pComp.Task.Status = model.TransitionTaskStatusFailed
 				pComp.Task.Error = errMsg
 				pComp.Task.StatusDesc = errMsg
-				err := (*GLOB.DSP).StoreTransitionTask(*pComp.Task)
+				err := GLOB.DSP.StoreTransitionTask(*pComp.Task)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 				}
@@ -1694,7 +1694,7 @@ func failDependentComps(xnameMap map[string]*TransitionComponent, powerAction st
 // - Aborts incomplete transitions (new/in-progress) that have expired (AutomaticExpirationTime).
 func transitionsReaper() {
 	// Get all transitions
-	transitions, err := (*GLOB.DSP).GetAllTransitions()
+	transitions, err := GLOB.DSP.GetAllTransitions()
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error retreiving transitions")
 		return
@@ -1720,7 +1720,7 @@ func transitionsReaper() {
 				}
 				// No need to check if the TAS succeeded because, if it didn't,
 				// it means someone else took care of it.
-				ok, err := (*GLOB.DSP).TASTransition(transition, transitionOld)
+				ok, err := GLOB.DSP.TASTransition(transition, transitionOld)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error aborting transition, %s.", transition.TransitionID.String())
 					continue
@@ -1739,7 +1739,7 @@ func transitionsReaper() {
 			// so other instances know we got it first.
 			transitionOld := transition
 			transition.LastActiveTime = time.Now()
-			ok, err := (*GLOB.DSP).TASTransition(transition, transitionOld)
+			ok, err := GLOB.DSP.TASTransition(transition, transitionOld)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error storing transition, %s.", transition.TransitionID.String())
 				continue
@@ -1804,19 +1804,19 @@ func transitionsReaper() {
 // Deletes the transition and any associated tasks.
 func deleteTransition(transitionID uuid.UUID) error {
 	// Get the tasks for the transition
-	tasks, err := (*GLOB.DSP).GetAllTasksForTransition(transitionID)
+	tasks, err := GLOB.DSP.GetAllTasksForTransition(transitionID)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error retreiving tasks for transition, %s.", transitionID.String())
 		return err
 	}
 	for _, task := range tasks {
-		err = (*GLOB.DSP).DeleteTransitionTask(transitionID, task.TaskID)
+		err = GLOB.DSP.DeleteTransitionTask(transitionID, task.TaskID)
 		if err != nil {
 			logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error deleting transition task, %s.", task.TaskID.String())
 			return err
 		}
 	}
-	err = (*GLOB.DSP).DeleteTransition(transitionID)
+	err = GLOB.DSP.DeleteTransition(transitionID)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error deleting transition, %s.", transitionID.String())
 		return err
@@ -1833,13 +1833,13 @@ func waitForBMC(compList []*TransitionComponent) {
 		for _, comp := range compList {
 			if retry == 0 {
 				comp.Task.StatusDesc = "Waiting for controller to be ready"
-				err := (*GLOB.DSP).StoreTransitionTask(*comp.Task)
+				err := GLOB.DSP.StoreTransitionTask(*comp.Task)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 				}
 			}
 			// Get the state from ETCD
-			pState, err := (*GLOB.DSP).GetPowerStatus(comp.Task.Xname)
+			pState, err := GLOB.DSP.GetPowerStatus(comp.Task.Xname)
 			if err != nil {
 				// If everything ends up being an error. We'll just stop waiting.
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error getting power status from database for %s", comp.Task.Xname)
@@ -1857,7 +1857,7 @@ func waitForBMC(compList []*TransitionComponent) {
 func getPowerSupplies(hData *hsm.HsmData) (powerSupplies []PowerSupply) {
 	for _, pConnector := range hData.PoweredBy {
 		powerState := model.PowerStateFilter_Undefined
-		pState, err := (*GLOB.DSP).GetPowerStatus(pConnector)
+		pState, err := GLOB.DSP.GetPowerStatus(pConnector)
 		if err == nil {
 			powerState, _ = model.ToPowerStateFilter(pState.PowerState)
 		}
@@ -1872,7 +1872,7 @@ func getPowerSupplies(hData *hsm.HsmData) (powerSupplies []PowerSupply) {
 
 func compressAndCompleteTransition(transition model.Transition, status string) {
 	// Get the tasks for the transition
-	tasks, err := (*GLOB.DSP).GetAllTasksForTransition(transition.TransitionID)
+	tasks, err := GLOB.DSP.GetAllTasksForTransition(transition.TransitionID)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error retreiving tasks for transition, %s.", transition.TransitionID.String())
 		return
@@ -1883,14 +1883,14 @@ func compressAndCompleteTransition(transition model.Transition, status string) {
 	transition.Tasks = rsp.Tasks
 	transition.Status = status
 	transition.IsCompressed = true
-	err = (*GLOB.DSP).StoreTransition(transition)
+	err = GLOB.DSP.StoreTransition(transition)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition")
 		// Don't delete the tasks if we were unsuccessful storing the transition.
 		return
 	}
 	for _, task := range tasks {
-		err = (*GLOB.DSP).DeleteTransitionTask(transition.TransitionID, task.TaskID)
+		err = GLOB.DSP.DeleteTransitionTask(transition.TransitionID, task.TaskID)
 		if err != nil {
 			logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error deleting transition task, %s.", task.TaskID.String())
 		}
