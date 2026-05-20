@@ -30,14 +30,16 @@ jobs:
       cgo-enabled: 1
       platforms: "linux/amd64"
       docker-file: "Dockerfile.build"
-  image_arm:
-    name: Build ARM Image
-    uses: OpenCHAMI/github-actions/.github/workflows/docker-build-release.yml@v3.3
-    with:
-      fetch-depth: 1
-      registry-name: ghcr.io/openchami/pcs
-      cgo-enabled: 1
-      additional-env-vars: |
-        CC=aarch64-linux-gnu-gcc
-      platforms: "linux/arm64"
-      docker-file: "Dockerfile.build"
+# Disabled! This is busted: multiple steps that push independently break the multi-arch manifest:
+# https://github.com/OpenCHAMI/power-control/issues/58#issuecomment-4502102485
+#  image_arm:
+#    name: Build ARM Image
+#    uses: OpenCHAMI/github-actions/.github/workflows/docker-build-release.yml@v3.3
+#    with:
+#      fetch-depth: 1
+#      registry-name: ghcr.io/openchami/pcs
+#      cgo-enabled: 1
+#      additional-env-vars: |
+#        CC=aarch64-linux-gnu-gcc
+#      platforms: "linux/arm64"
+#      docker-file: "Dockerfile.build"
