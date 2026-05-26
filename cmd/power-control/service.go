@@ -12,7 +12,6 @@ import (
 
 	base "github.com/Cray-HPE/hms-base/v2"
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
-	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
@@ -23,6 +22,7 @@ import (
 	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/OpenCHAMI/power-control/v2/internal/taskrun"
 )
 
 // Default Port to use
@@ -59,7 +59,7 @@ var (
 	restSrv             *http.Server = nil
 	waitGroup           sync.WaitGroup
 	rfClient, svcClient *hms_certs.HTTPClientPair
-	TLOC_rf, TLOC_svc   trsapi.TrsAPI
+	TLOC_rf, TLOC_svc   taskrun.TrsAPI
 	caURI               string
 	rfClientLock        *sync.RWMutex = &sync.RWMutex{}
 	serviceName         string
@@ -148,7 +148,7 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, 
 		}
 	}
 
-	var BaseTRSTask trsapi.HttpTask
+	var BaseTRSTask taskrun.HttpTask
 	BaseTRSTask.ServiceName = serviceName
 	BaseTRSTask.Timeout = time.Duration(baseTrsTaskTimeout) * time.Second
 	BaseTRSTask.Request, _ = http.NewRequest("GET", "", nil)
@@ -173,23 +173,13 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, 
 
 	envstr = os.Getenv("TRS_IMPLEMENTATION")
 
-	if envstr == "REMOTE" {
-		workerSec := &trsapi.TRSHTTPRemote{}
-		workerSec.Logger = trsLogger
-		workerInsec := &trsapi.TRSHTTPRemote{}
-		workerInsec.Logger = trsLogger
-		TLOC_rf = workerSec
-		TLOC_svc = workerInsec
-		logger.Log.Infof("Using TRS_IMPLEMENTATION: REMOTE")
-	} else {
-		workerSec := &trsapi.TRSHTTPLocal{}
-		workerSec.Logger = trsLogger
-		workerInsec := &trsapi.TRSHTTPLocal{}
-		workerInsec.Logger = trsLogger
-		TLOC_rf = workerSec
-		TLOC_svc = workerInsec
-		logger.Log.Infof("Using TRS_IMPLEMENTATION: LOCAL")
-	}
+	workerSec := &taskrun.TRSHTTPLocal{}
+	workerSec.Logger = trsLogger
+	workerInsec := &taskrun.TRSHTTPLocal{}
+	workerInsec.Logger = trsLogger
+	TLOC_rf = workerSec
+	TLOC_svc = workerInsec
+	logger.Log.Infof("Using TRS_IMPLEMENTATION: LOCAL")
 
 	//Set up TRS TLOCs and HTTP clients, all insecure to start with
 
@@ -448,7 +438,7 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, 
 				logger.Log.Infof("Locking RF operations...")
 				rfClientLock.Lock() //waits for all RW locks to release
 				tchain := hms_certs.NewlineToTuple(caChain)
-				secInfo := trsapi.TRSHTTPLocalSecurity{CACertBundleData: tchain}
+				secInfo := taskrun.TRSHTTPLocalSecurity{CACertBundleData: tchain}
 				err = TLOC_rf.SetSecurity(secInfo)
 				if err != nil {
 					logger.Log.Errorf("Error setting TLOC security info: %v, retrying...",

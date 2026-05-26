@@ -1,0 +1,336 @@
+// MIT License
+//
+// (C) Copyright [2021,2024-2025] Hewlett Packard Enterprise Development LP
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the "Software"),
+// to deal in the Software without restriction, including without limitation
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,
+// and/or sell copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+// OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+// ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
+package taskrun
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"errors"
+	"io/ioutil"
+	"mime/multipart"
+	"net/http"
+	"net/url"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type SerializedRequest struct {
+	Method           string               `json:",omitempty"`
+	URL              *url.URL             `json:",omitempty"`
+	Proto            string               `json:",omitempty"` // "HTTP/1.0"
+	ProtoMajor       int                  `json:",omitempty"` // 1
+	ProtoMinor       int                  `json:",omitempty"` // 0
+	Header           http.Header          `json:",omitempty"`
+	Body             []byte               `json:",omitempty"`
+	ContentLength    int64                `json:",omitempty"`
+	TransferEncoding []string             `json:",omitempty"`
+	Close            bool                 `json:",omitempty"`
+	Host             string               `json:",omitempty"`
+	Form             url.Values           `json:",omitempty"`
+	PostForm         url.Values           `json:",omitempty"` // Go 1.1
+	MultipartForm    *multipart.Form      `json:",omitempty"`
+	Trailer          http.Header          `json:",omitempty"`
+	RemoteAddr       string               `json:",omitempty"`
+	RequestURI       string               `json:",omitempty"`
+	TLS              *tls.ConnectionState `json:",omitempty"`
+}
+
+type HttpKafkaTx struct {
+	ID          uuid.UUID
+	Request     SerializedRequest `json:",omitempty"`
+	TimeStamp   string            `json:",omitempty"` // Time the request time.Now().String()
+	Timeout     time.Duration     `json:",omitempty"`
+	CPolicy     ClientPolicy
+	ServiceName string
+	Ignore      bool
+}
+
+type HttpKafkaRx struct {
+	ID       uuid.UUID // message ID
+	Response *SerializedResponse
+	Err      *error
+}
+
+type RetryPolicy struct {
+	Retries        int           // number of retries to attempt (default is 3)
+	BackoffTimeout time.Duration // base backoff timeout between retries (default is 5 seconds)
+}
+
+type HttpTxPolicy struct {
+	Enabled               bool          // policy enabled (default is false)
+	MaxIdleConns          int           // max idle connections across all hosts (default is 100)
+	MaxIdleConnsPerHost   int           // max idle connections per host (default is 2)
+	IdleConnTimeout       time.Duration // duration an idle connection remains open (default is unlimited)
+	ResponseHeaderTimeout time.Duration // max wait time for a host's response header (default is unlimited)
+	TLSHandshakeTimeout   time.Duration // max duration for the TLS handshake (default is 10 seconds)
+	DisableKeepAlives     bool          // disable HTTP keep-alives if true (default is false)
+}
+
+type ClientPolicy struct {
+	Retry RetryPolicy  // task's retry policy
+	Tx    HttpTxPolicy // task's transport policy
+}
+
+type HttpTask struct {
+	id            uuid.UUID          // message id
+	ServiceName   string             // name of the service (defaults to TRSHTTPLocal.svcName)
+	Request       *http.Request      // the http request
+	TimeStamp     string             // time the request was created/sent RFC3339Nano
+	Err           *error             // any error associated with the request
+	Timeout       time.Duration      // task's context timeout (default is 30 seconds)
+	CPolicy       ClientPolicy       // task's retry and transport policies
+	Ignore        bool               // if true, trs will ignore this task
+	context       context.Context    // task's context
+	contextCancel context.CancelFunc // task's context cancellation function
+	forceInsecure bool               // if true, force insecure communication
+}
+
+type SerializedResponse struct {
+	Status           string // e.g. "200 OK"
+	StatusCode       int    // e.g. 200
+	Proto            string // e.g. "HTTP/1.0"
+	ProtoMajor       int    // e.g. 1
+	ProtoMinor       int    // e.g. 0
+	Header           http.Header
+	Body             []byte
+	ContentLength    int64
+	TransferEncoding []string
+	Close            bool
+	Uncompressed     bool
+	Trailer          http.Header
+	TLS              *tls.ConnectionState
+}
+
+func (ht HttpTask) Validate() (valid bool, err error) {
+	valid = false
+	if ht.TimeStamp == "" {
+		err = errors.New("Timstamp is empty")
+		return false, err
+	} else if ht.Request == nil {
+		err = errors.New("Request is nil")
+		return false, err
+	} else if ht.ServiceName == "" {
+		err = errors.New("ServiceName is empty")
+		return false, err
+	} else if ht.id == uuid.Nil {
+		err = errors.New("ID is nil")
+		return false, err
+	}
+
+	valid = true
+	return valid, err
+}
+
+func (ht *HttpTask) GetID() (uuid uuid.UUID) {
+	uuid = ht.id
+	return uuid
+}
+
+func (ht *HttpTask) SetIDIfNotPopulated() uuid.UUID {
+	if ht.id == uuid.Nil {
+		ht.id = uuid.New()
+	}
+	return ht.id
+}
+
+func (ht HttpTask) ToHttpKafkaTx() (tx HttpKafkaTx) {
+	//Fill the data
+	tx.ID = ht.id
+	tx.Timeout = ht.Timeout
+	tx.CPolicy = ht.CPolicy
+	tx.TimeStamp = ht.TimeStamp
+	tx.Request = ToSerializedRequest(*ht.Request)
+	tx.ServiceName = ht.ServiceName
+	tx.Ignore = ht.Ignore
+
+	return tx
+}
+
+func (tx HttpKafkaTx) ToHttpTask() (ht HttpTask) {
+	//Fill the service data
+	ht.id = tx.ID
+	ht.ServiceName = tx.ServiceName
+	ht.CPolicy = tx.CPolicy
+	ht.Timeout = tx.Timeout
+	ht.TimeStamp = tx.TimeStamp
+	ht.Ignore = tx.Ignore
+
+	req := tx.Request.ToHttpRequest()
+	ht.Request = &req
+
+	return ht
+}
+
+func ToSerializedRequest(req http.Request) (sr SerializedRequest) {
+
+	sr.Method = req.Method
+	sr.URL = req.URL
+	sr.Proto = req.Proto
+	sr.ProtoMajor = req.ProtoMajor
+	sr.ProtoMinor = req.ProtoMinor
+	sr.Header = req.Header
+	if req.Body != nil {
+		sr.Body, _ = ioutil.ReadAll(req.Body)
+	}
+	sr.ContentLength = req.ContentLength
+	sr.TransferEncoding = req.TransferEncoding
+	sr.Close = req.Close
+	sr.Host = req.Host
+	sr.Form = req.Form
+	sr.PostForm = req.PostForm
+	sr.MultipartForm = req.MultipartForm
+	sr.Trailer = req.Trailer
+	sr.RemoteAddr = req.RemoteAddr
+	sr.RequestURI = req.RequestURI
+	sr.TLS = req.TLS
+
+	return sr
+}
+
+func (sr SerializedRequest) ToHttpRequest() (req http.Request) {
+
+	//GRAB REQUEST DATA
+	req.Method = sr.Method
+	req.URL = sr.URL
+	req.Proto = sr.Proto
+	req.ProtoMajor = sr.ProtoMajor
+	req.ProtoMinor = sr.ProtoMinor
+	req.Header = sr.Header
+	if sr.Body != nil {
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(sr.Body))
+	}
+	req.ContentLength = sr.ContentLength
+	req.TransferEncoding = sr.TransferEncoding
+	req.Close = sr.Close
+	req.Host = sr.Host
+	req.Form = sr.Form
+	req.PostForm = sr.PostForm
+	req.MultipartForm = sr.MultipartForm
+	req.Trailer = sr.Trailer
+	req.RemoteAddr = sr.RemoteAddr
+	req.RequestURI = sr.RequestURI
+	req.TLS = sr.TLS
+
+	return req
+}
+
+func (ht HttpTask) ToHttpKafkaRx() (rx HttpKafkaRx) {
+	//Fill the data
+	rx.ID = ht.id
+	if ht.Err != nil {
+		rx.Err = ht.Err
+	}
+	if ht.Request.Response != nil {
+		var res SerializedResponse
+		tmp := ToSerializedResponse(*ht.Request.Response)
+		res = tmp
+		rx.Response = &res
+	}
+	return rx
+}
+
+func ToSerializedResponse(resp http.Response) (sr SerializedResponse) {
+	sr.Status = resp.Status
+	sr.StatusCode = resp.StatusCode
+	sr.Proto = resp.Proto
+	sr.ProtoMajor = resp.ProtoMajor
+	sr.ProtoMinor = resp.ProtoMinor
+	sr.Header = resp.Header
+	if resp.Body != nil {
+		sr.Body, _ = ioutil.ReadAll(resp.Body)
+	}
+	sr.ContentLength = resp.ContentLength
+	sr.TransferEncoding = resp.TransferEncoding
+	sr.Close = resp.Close
+	sr.Uncompressed = resp.Uncompressed
+	sr.Trailer = resp.Trailer
+	sr.TLS = resp.TLS
+
+	return sr
+}
+
+func (sr SerializedResponse) ToHttpResponse() (resp http.Response) {
+	resp.Status = sr.Status
+	resp.StatusCode = sr.StatusCode
+	resp.Proto = sr.Proto
+	resp.ProtoMajor = sr.ProtoMajor
+	resp.ProtoMinor = sr.ProtoMinor
+	resp.Header = sr.Header
+	if sr.Body != nil {
+		resp.Body = ioutil.NopCloser(bytes.NewBuffer(sr.Body))
+	}
+	resp.ContentLength = sr.ContentLength
+	resp.TransferEncoding = sr.TransferEncoding
+	resp.Close = sr.Close
+	resp.Uncompressed = sr.Uncompressed
+	resp.Trailer = sr.Trailer
+	resp.TLS = sr.TLS
+	return resp
+}
+
+func (sr SerializedResponse) Equal(sr1 SerializedResponse) (equal bool) {
+	equal = false
+	if sr.Status == sr1.Status &&
+		sr.StatusCode == sr1.StatusCode &&
+		sr.ProtoMajor == sr1.ProtoMajor &&
+		sr.Proto == sr1.Proto &&
+		sr.ProtoMinor == sr.ProtoMinor &&
+		sr.ContentLength == sr1.ContentLength &&
+		sr.Close == sr1.Close &&
+		sr.Uncompressed == sr1.Uncompressed &&
+		//sr.Body == sr1.Body &&
+		//sr.TransferEncoding == sr1.TransferEncoding &&
+		//sr.Header == sr1.Header &&
+		//sr.Trailer == sr1.Trailer &&
+		sr.TLS == sr1.TLS {
+		equal = true
+	}
+
+	return equal
+}
+
+func (sr SerializedRequest) Equal(sr1 SerializedRequest) (equal bool) {
+	equal = false
+	if sr.URL == sr1.URL &&
+		sr.ProtoMajor == sr1.ProtoMajor &&
+		sr.Proto == sr1.Proto &&
+		sr.ProtoMinor == sr.ProtoMinor &&
+		sr.ContentLength == sr1.ContentLength &&
+		sr.Close == sr1.Close &&
+		sr.Method == sr1.Method &&
+		//sr.PostForm == sr1.PostForm &&
+		//sr.Form == sr1.Form &&
+		//sr.Header == sr1.Header &&
+		//sr.Trailer == sr1.Trailer &&
+		//sr.Body == sr1.Body &&
+		sr.Host == sr1.Host &&
+		sr.RemoteAddr == sr1.RemoteAddr &&
+		sr.RequestURI == sr1.RequestURI &&
+		sr.TLS == sr1.TLS {
+		equal = true
+	}
+
+	return equal
+}

@@ -36,7 +36,6 @@ import (
 
 	base "github.com/Cray-HPE/hms-base/v2"
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
-	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 
@@ -45,6 +44,7 @@ import (
 	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/OpenCHAMI/power-control/v2/internal/taskrun"
 )
 
 type Models_TS struct {
@@ -55,7 +55,7 @@ var glogger = logrus.New()
 
 var (
 	Running   bool
-	TLOC_rf   trsapi.TrsAPI
+	TLOC_rf   taskrun.TrsAPI
 	DSP       storage.StorageProvider
 	HSM       hsm.HSMProvider
 	CS        credstore.CredStoreProvider
@@ -87,7 +87,7 @@ func setupGlobals(suite *Models_TS) {
 	err = HSM.Init(&glb)
 	suite.Assert().Equal(err, nil, "ERROR calling Init(): %v", err)
 
-	workerSec := &trsapi.TRSHTTPLocal{}
+	workerSec := &taskrun.TRSHTTPLocal{}
 	TLOC_rf = workerSec
 	TLOC_rf.Init("HealthTest", glogger)
 
