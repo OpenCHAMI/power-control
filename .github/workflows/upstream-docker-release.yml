@@ -27,17 +27,6 @@ jobs:
     with:
       fetch-depth: 1
       registry-name: ghcr.io/openchami/pcs
-      cgo-enabled: 1
-      platforms: "linux/amd64"
-      docker-file: "Dockerfile.build"
-  image_arm:
-    name: Build ARM Image
-    uses: OpenCHAMI/github-actions/.github/workflows/docker-build-release.yml@v3.3
-    with:
-      fetch-depth: 1
-      registry-name: ghcr.io/openchami/pcs
-      cgo-enabled: 1
-      additional-env-vars: |
-        CC=aarch64-linux-gnu-gcc
-      platforms: "linux/arm64"
+      cgo-enabled: 0
+      platforms: "linux/amd64,linux/arm64"
       docker-file: "Dockerfile.build"
