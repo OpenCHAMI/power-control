@@ -7,13 +7,14 @@ import (
 	"net/http"
 
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
-	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"golang.org/x/oauth2"
+
+	"github.com/openchami/power-control/v2/internal/taskrun"
 )
 
 // initHTTPClients loads trust once, before clients are shared with workers or
 // reservations. Certificate changes require a restart.
-func initHTTPClients(caURI string, rfTloc trsapi.TrsAPI, tokenSource oauth2.TokenSource) (*hms_certs.HTTPClientPair, *hms_certs.HTTPClientPair, error) {
+func initHTTPClients(caURI string, rfTloc taskrun.TrsAPI, tokenSource oauth2.TokenSource) (*hms_certs.HTTPClientPair, *hms_certs.HTTPClientPair, error) {
 	var roots *x509.CertPool
 	if caURI != "" {
 		chain, err := hms_certs.FetchCAChain(caURI)
@@ -28,7 +29,7 @@ func initHTTPClients(caURI string, rfTloc trsapi.TrsAPI, tokenSource oauth2.Toke
 		if !roots.AppendCertsFromPEM([]byte(chain)) {
 			return nil, nil, fmt.Errorf("PCS_CA_URI %q contains no valid CA certificates", caURI)
 		}
-		if err := rfTloc.SetSecurity(trsapi.TRSHTTPLocalSecurity{CACertBundleData: chain}); err != nil {
+		if err := rfTloc.SetSecurity(taskrun.TRSHTTPLocalSecurity{CACertBundleData: chain}); err != nil {
 			return nil, nil, fmt.Errorf("configure Redfish TRS security: %w", err)
 		}
 	}
