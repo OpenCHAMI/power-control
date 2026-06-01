@@ -23,11 +23,11 @@ permissions: write-all # Necessary for the generate-build-provenance action with
 jobs:
   image:
     name: Build & Push Multi-arch Image
-    uses: OpenCHAMI/github-actions/.github/workflows/docker-build-release.yml@v3.3
+    uses: OpenCHAMI/github-actions/.github/workflows/docker-build-release.yml@feature/multi-arch-build-refinements@feature/multi-arch-build-refinements
     with:
       fetch-depth: 1
       registry-name: ghcr.io/openchami/pcs
       cgo-enabled: 1
       platforms: "linux/amd64,linux/arm64"
       docker-file: "Dockerfile.build"
-      # Don't pass CC here - let the Dockerfile set it based on TARGETARCH
+      image-description: "Multi-architecture power control service for OpenCHAMI (supports linux/amd64 and linux/arm64)"
