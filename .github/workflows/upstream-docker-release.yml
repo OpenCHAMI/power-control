@@ -22,22 +22,15 @@ permissions: write-all # Necessary for the generate-build-provenance action with
 
 jobs:
   image:
-    name: Build Image
+    name: Build & Push Multi-arch Image
     uses: OpenCHAMI/github-actions/.github/workflows/docker-build-release.yml@v3.3
     with:
       fetch-depth: 1
       registry-name: ghcr.io/openchami/pcs
       cgo-enabled: 1
-      platforms: "linux/amd64"
+      # Build both amd64 and arm64 in a single run – Docker Buildx will create a manifest list.
+      platforms: "linux/amd64,linux/arm64"
       docker-file: "Dockerfile.build"
-  image_arm:
-    name: Build ARM Image
-    uses: OpenCHAMI/github-actions/.github/workflows/docker-build-release.yml@v3.3
-    with:
-      fetch-depth: 1
-      registry-name: ghcr.io/openchami/pcs
-      cgo-enabled: 1
+      # The arm64 build needs the cross-compiler; the amd64 build simply ignores it.
       additional-env-vars: |
         CC=aarch64-linux-gnu-gcc
-      platforms: "linux/arm64"
-      docker-file: "Dockerfile.build"
