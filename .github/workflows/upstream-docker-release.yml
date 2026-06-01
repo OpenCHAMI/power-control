@@ -28,9 +28,6 @@ jobs:
       fetch-depth: 1
       registry-name: ghcr.io/openchami/pcs
       cgo-enabled: 1
-      # Build both amd64 and arm64 in a single run – Docker Buildx will create a manifest list.
       platforms: "linux/amd64,linux/arm64"
       docker-file: "Dockerfile.build"
-      # The arm64 build needs the cross-compiler; the amd64 build simply ignores it.
-      additional-env-vars: |
-        CC=aarch64-linux-gnu-gcc
+      # Don't pass CC here - let the Dockerfile set it based on TARGETARCH

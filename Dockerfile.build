@@ -54,16 +54,21 @@ ARG CGO_ENABLED
 RUN mkdir bin
 
 # Build the binary with appropriate cross-compilation settings
-# For arm64, use the cross-compiler; for amd64, use the default toolchain
+# Set CC based on target architecture (don't rely on build args for multi-arch builds)
 RUN set -ex && \
+    echo "Building for TARGETARCH=${TARGETARCH}" && \
     export CGO_ENABLED="${CGO_ENABLED}" && \
     export GOOS=linux && \
     export GOARCH="${TARGETARCH}" && \
     export GO111MODULE=on && \
     if [ "${TARGETARCH}" = "arm64" ]; then \
-      export CC="${CC:-aarch64-linux-gnu-gcc}" && \
+      echo "Using ARM64 cross-compiler" && \
+      export CC="aarch64-linux-gnu-gcc" && \
+      echo "CC is now: ${CC}" && \
       go build -ldflags="-extld=${CC}" -v -o bin/power-control ./cmd/power-control; \
     else \
+      echo "Using native amd64 compiler" && \
+      echo "Building without external CC" && \
       go build -v -o bin/power-control ./cmd/power-control; \
     fi
 
