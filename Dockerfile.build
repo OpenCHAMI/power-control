@@ -20,8 +20,9 @@ RUN printf "Building for TARGETPLATFORM=${TARGETPLATFORM}" \
     && printf "With 'uname -s': $(uname -s) and 'uname -m': $(uname -m)"
 
 # Install cross-compilation dependencies
+# Install build-essential for native compilation and aarch64 cross-compiler for ARM builds
 RUN apt-get update && \
-    apt-get install -y g++-aarch64-linux-gnu && \
+    apt-get install -y build-essential g++-aarch64-linux-gnu && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
@@ -52,20 +53,17 @@ ARG CGO_ENABLED
 
 RUN mkdir bin
 
-# Use shell parameter expansion to add -ldflags if CC is set to specify the external linker
-# For arm64, use the cross-compiler; for amd64, use the default compiler
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
-      CGO_ENABLED="${CGO_ENABLED}" \
-      GOOS=linux \
-      GOARCH="${TARGETARCH}" \
-      CC="${CC}" \
-      GO111MODULE=on \
+# Build the binary with appropriate cross-compilation settings
+# For arm64, use the cross-compiler; for amd64, use the default toolchain
+RUN set -ex && \
+    export CGO_ENABLED="${CGO_ENABLED}" && \
+    export GOOS=linux && \
+    export GOARCH="${TARGETARCH}" && \
+    export GO111MODULE=on && \
+    if [ "${TARGETARCH}" = "arm64" ]; then \
+      export CC="${CC:-aarch64-linux-gnu-gcc}" && \
       go build -ldflags="-extld=${CC}" -v -o bin/power-control ./cmd/power-control; \
     else \
-      CGO_ENABLED="${CGO_ENABLED}" \
-      GOOS=linux \
-      GOARCH="${TARGETARCH}" \
-      GO111MODULE=on \
       go build -v -o bin/power-control ./cmd/power-control; \
     fi
 
