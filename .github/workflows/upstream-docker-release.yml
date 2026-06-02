@@ -30,4 +30,4 @@ jobs:
       cgo-enabled: 1
       platforms: "linux/amd64,linux/arm64"
       docker-file: "Dockerfile.build"
-      image-description: "Multi-architecture power control service for OpenCHAMI (supports linux/amd64 and linux/arm64)"
+      image-description: "OpenCHAMI Power Control Service"
