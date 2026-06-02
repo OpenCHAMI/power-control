@@ -78,7 +78,7 @@ FROM chainguard/wolfi-base:latest AS main
 
 # OCI labels for better container metadata
 LABEL org.opencontainers.image.title="OpenCHAMI Power Control Service" \
-      org.opencontainers.image.description="Multi-architecture power control service for OpenCHAMI (supports linux/amd64 and linux/arm64)" \
+      org.opencontainers.image.description="OpenCHAMI Power Control Service" \
       org.opencontainers.image.vendor="OpenCHAMI" \
       org.opencontainers.image.source="https://github.com/OpenCHAMI/power-control" \
       org.opencontainers.image.documentation="https://github.com/OpenCHAMI/power-control/blob/main/README.md" \
