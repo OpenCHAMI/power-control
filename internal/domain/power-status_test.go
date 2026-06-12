@@ -36,7 +36,6 @@ import (
 
 	base "github.com/Cray-HPE/hms-base/v2"
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
-	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/Cray-HPE/hms-xname/xnametypes"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
@@ -45,6 +44,7 @@ import (
 	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
 	pcsmodel "github.com/OpenCHAMI/power-control/v2/internal/model"
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/OpenCHAMI/power-control/v2/internal/taskrun"
 )
 
 type PwrStat_TS struct {
@@ -62,7 +62,7 @@ func glbInit() {
 		var credStoreGlob credstore.CREDSTORE_GLOBALS
 		lsvcName := "PwrControlTest"
 
-		var TLOC_rf trsapi.TrsAPI
+		var TLOC_rf taskrun.TrsAPI
 		var CS credstore.CredStoreProvider
 		tcs := &credstore.VAULTv0{}
 		var HSM hsm.HSMProvider
@@ -102,7 +102,7 @@ func glbInit() {
 		DSP = sprov
 		DSP.Init(tlogger)
 
-		winsec := &trsapi.TRSHTTPLocal{}
+		winsec := &taskrun.TRSHTTPLocal{}
 		winsec.Logger = tlogger
 		TLOC_rf = winsec
 		TLOC_rf.Init(lsvcName, tlogger)

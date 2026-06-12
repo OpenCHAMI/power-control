@@ -33,16 +33,15 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base/v2"
-	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/Cray-HPE/hms-xname/xnametypes"
 	rf "github.com/OpenCHAMI/smd/v2/pkg/redfish"
+	"github.com/sirupsen/logrus"
 
 	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
 	pcshsm "github.com/OpenCHAMI/power-control/v2/internal/hsm"
 	pcsmodel "github.com/OpenCHAMI/power-control/v2/internal/model"
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
-
-	"github.com/sirupsen/logrus"
+	"github.com/OpenCHAMI/power-control/v2/internal/taskrun"
 )
 
 // Power monitoring framework.  The general flow of this framework:
@@ -67,7 +66,7 @@ type componentPowerInfo struct {
 
 // Used for local TRS response handling
 type rspStuff struct {
-	task *trsapi.HttpTask
+	task *taskrun.HttpTask
 	body []byte
 }
 
@@ -82,7 +81,7 @@ var hsmHandle *pcshsm.HSMProvider
 var kvStore *storage.StorageProvider
 var ccStore *credstore.CredStoreProvider
 var distLocker *storage.DistributedLockProvider
-var tloc *trsapi.TrsAPI
+var tloc *taskrun.TrsAPI
 var pmSampleInterval time.Duration
 var distLockMaxTime time.Duration
 var pstateMonitorRunning bool
@@ -447,7 +446,7 @@ func getVaultCredsAll(compMap map[string]*componentPowerInfo) error {
 //
 // So for now, if there is no Response data and Err is nil, we will consider
 // that a 204.  If there is no Response and Err is populated, it will be a 500.
-func getStatusCode(tp *trsapi.HttpTask) int {
+func getStatusCode(tp *taskrun.HttpTask) int {
 	var ecode int
 	if tp.Request.Response != nil {
 		ecode = int(tp.Request.Response.StatusCode)
@@ -483,13 +482,13 @@ func getHWStatesFromHW() error {
 
 	idleConnTimeout := (statusTimeout + int(pmSampleInterval/time.Second)) * 15 / 10
 
-	sourceTL := trsapi.HttpTask{
+	sourceTL := taskrun.HttpTask{
 		Timeout: time.Duration(statusTimeout) * time.Second,
-		CPolicy: trsapi.ClientPolicy{
-			Retry: trsapi.RetryPolicy{
+		CPolicy: taskrun.ClientPolicy{
+			Retry: taskrun.RetryPolicy{
 				Retries: httpRetries,
 			},
-			Tx: trsapi.HttpTxPolicy{
+			Tx: taskrun.HttpTxPolicy{
 				Enabled:             true,
 				MaxIdleConns:        maxIdleConns,
 				MaxIdleConnsPerHost: maxIdleConnsPerHost,

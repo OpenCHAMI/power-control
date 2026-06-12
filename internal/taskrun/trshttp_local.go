@@ -1,0 +1,785 @@
+// MIT License
+//
+// (C) Copyright [2020-2021,2024-2025] Hewlett Packard Enterprise Development LP
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the "Software"),
+// to deal in the Software without restriction, including without limitation
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,
+// and/or sell copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+// OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+// ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
+package taskrun
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"runtime"
+	"sync"
+	"time"
+
+	base "github.com/Cray-HPE/hms-base/v2"
+	"github.com/google/uuid"
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/sirupsen/logrus"
+)
+
+const (
+	DFLT_RETRY_MAX   = 3  //default max # of retries on failure
+	DFLT_BACKOFF_MAX = 5  //default max seconds per retry
+	DFLT_CTX_TIMEOUT = 30 //default context timeout in seconds
+)
+
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+//                   L O C A L  I N T E R F A C E
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+// Initialize the local HTTP task system.
+//
+// serviceName: Name of the service or application
+// logger:      The logger to use; if nil, a default logger is created
+//
+// Return:      Nil on success; error string on failure
+
+func (tloc *TRSHTTPLocal) Init(serviceName string, logger *logrus.Logger) error {
+	if logger != nil {
+		tloc.Logger = logger
+	} else {
+		tloc.Logger = logrus.New()
+	}
+
+	tloc.ctx, tloc.ctxCancelFunc = context.WithCancel(context.Background())
+
+	if tloc.taskMap == nil {
+		tloc.taskMutex.Lock()
+		tloc.taskMap = make(map[uuid.UUID]*taskChannelTuple)
+		tloc.taskMutex.Unlock()
+	}
+	if tloc.clientMap == nil {
+		tloc.clientMutex.Lock()
+		tloc.clientMap = make(map[ClientPolicy]*clientPack)
+		tloc.clientMutex.Unlock()
+	}
+	tloc.svcName = serviceName
+
+	tloc.Logger.Tracef("Init() successful")
+
+	return nil
+}
+
+// Set up the local HTTP task system to use a CA cert bundle and optional
+// client cert/key data.  This is used to set up a secure connection to the
+// target system. The CA cert bundle is required.  The client cert/key data
+// is optional.
+//
+// inParams: Pointer to a TRSHTTPLocalSecurity struct containing the CA cert
+//           bundle and optional client cert/key data.
+//
+// Return:   Nil on success; error string on failure
+
+func (tloc *TRSHTTPLocal) SetSecurity(inParams interface{}) error {
+	params := inParams.(TRSHTTPLocalSecurity)
+
+	if params.CACertBundleData == "" {
+		err := fmt.Errorf("CA cert bundle required.")
+		tloc.Logger.Errorf("SetSecurity(): %v", err)
+		return err
+	}
+
+	tloc.CACertPool, _ = x509.SystemCertPool()
+	if tloc.CACertPool == nil {
+		tloc.CACertPool = x509.NewCertPool()
+	}
+	tloc.CACertPool.AppendCertsFromPEM([]byte(params.CACertBundleData))
+
+	if (params.ClientCertData != "") && (params.ClientKeyData != "") {
+		var err error
+		tloc.ClientCert, err = tls.X509KeyPair([]byte(params.ClientCertData), []byte(params.ClientKeyData))
+		if err != nil {
+			tloc.Logger.Errorf("SetSecurity(): Error generating client cert: %v",
+				err)
+			return err
+		}
+	}
+
+	tloc.Logger.Tracef("SetSecurity() successful")
+
+	return nil
+}
+
+// Create an array of task descriptors.  Data is copied from the source task
+// into each element of the returned array.  Per-task data should then be
+// populated by the caller after control returns.
+//
+// A unique message id and TimeStamp in each task is populated regardless of
+// the value in the source.   It is generated using a pseudo-random value in
+// the upper 32 bits, which is the message group id, followed by a
+// monotonically increasing value in the lower 32 bits, starting with 0,
+// which functions as the message id.
+//
+// source:   Pounter to a task descriptor populated with relevant data.  The
+//           only fields that should be set by the caller are:
+//               - ServiceName
+//               - Request
+//               - Timeout
+//               - CPolicy
+//               - Ignore
+//               - forceInsecure
+// numTasks: Number of elements in the array to be returned
+//
+// Return:   Array of populated task descriptors
+
+func (tloc *TRSHTTPLocal) CreateTaskList(source *HttpTask, numTasks int) []HttpTask {
+	return createHTTPTaskArray(source, numTasks)
+}
+
+// The retryablehttp module closes idle connections in an overly aggressive
+// manner.  If a single request experiences a timeout, all idle connections
+// are closed.  If a single requests exceeds all retries, all idle
+// connections are closed.  The following RoundTrip wrapper helps us
+// wrap various retryablehttp and http interfaces to prevent this.
+
+type trsRoundTripper struct {
+	transport                             *http.Transport
+	closeIdleConnectionsFn                func()
+	skipCloseCount                        uint64
+	skipCloseMutex                        sync.Mutex
+	timeLastClosedOrReachedZeroCloseCount time.Time
+}
+
+// Our RoundTripper(). Just call RoundTrip interface at next level down.
+func (c *trsRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return c.transport.RoundTrip(req)
+}
+
+// Our wrapper around the standard http.Client's CloseIdleConnections()
+// We only call the interface at the next level down if skipCloseCount
+// counter is zero. This counter is decremented by our CheckRetry
+// wrapper (further below) if it detects a http timeout, context
+// timeout, or retry limit exceeded for a request.
+//
+// There may be a hole in the logic whereby a request sets the skip
+// counter but is then killed for whatever reason before it can call into
+// this wrapper. This would leave the counter at non-zero forever.  It
+// would be very unlikely to happen, but logically possible. We guard
+// against this by resetting the counter to zero if its been 2 hours since:
+//
+//	* The last call to c.CloseIdleConnectionsFn()
+//	* The last time the c.skipCloseCount reached zero
+//
+// Prior to this change, the TRS module would ALWAYS closing all idle
+// connections after every single http timeout, context timeout, or retry
+// count exceeded condition.  So, if we close out all the connections
+// occasionally after a two hour period, not a big deal.
+//
+// WARNING!  The Go runtime behavior surrounding connections has changed in
+//           more recent versions of Go.  Prior to version 1.23, if any
+//           request experiences a timeout, the Go runtime closes ALL idle
+//           connections.  There is nothing we can do about this in TRS,
+//           other than use a newer version of Go that doesn't exhibit this
+//           behavior.  Issue is documented here:
+//
+//           * https://github.com/golang/go/issues/59017
+//           * https://github.com/golang/go/commit/334ce510046ad30b1be466634cf313aad3040892
+//
+//           Will attempt to jump to Go 1.23 with this commit.
+
+//var wrapperLogger *logrus.Logger	// only uncomment if debugging wrapper issues
+
+func (c *trsRoundTripper) CloseIdleConnections() {
+	// Skip closing idle connections if counter > 0
+
+	c.skipCloseMutex.Lock()
+	if c.skipCloseCount > 0 {
+		c.skipCloseCount--
+
+		if c.skipCloseCount == 0 {
+			// Mark the time the counter last reached zero
+			c.timeLastClosedOrReachedZeroCloseCount = time.Now()
+		}
+
+		if time.Since(c.timeLastClosedOrReachedZeroCloseCount) > (2 * time.Hour) {
+			// If its been two hours since we last closed idle connections
+			// or since the counter last reached zero, reset the counter to
+			// zero and proceed to close idle connections
+
+			c.skipCloseCount = 0
+
+			// Time will be marked below when we close idle connections
+		} else {
+			c.skipCloseMutex.Unlock()
+
+			return
+		}
+	}
+
+	// Continue holding mutex until skipCloseCountResetTime is updated
+
+	if c.closeIdleConnectionsFn == nil {
+		// Nothing to do so release mutex
+		c.skipCloseMutex.Unlock()
+
+	} else {
+		// Mark the time of this call to close connections
+		c.timeLastClosedOrReachedZeroCloseCount = time.Now()
+
+		c.skipCloseMutex.Unlock()
+
+		// Call next level down
+		c.closeIdleConnectionsFn()
+	}
+}
+
+// Custom request wrapper that includes a retry counter that we'll use to
+// determine whether or not to close idle connections
+type trsWrappedReq struct {
+	orig       *http.Request // request we're wrapping
+	retryMax   int           // retry max from request
+	retryCount int           // retry count for this request
+}
+
+// drainAndCloseBody is a simple helper function reused in many places
+
+func drainAndCloseBody(resp *http.Response) {
+	if resp != nil && resp.Body != nil {
+		_, _ = io.Copy(io.Discard, resp.Body) // Drain the body
+		resp.Body.Close()                     // Close the body
+		resp.Body = nil                       // Prevent double-handling
+	}
+}
+
+// Our wrapper around retryablehttp's CheckRetry().  if we detect an http
+// timeout, context timeout, or a retry limit exceeded for a request, then
+// we decrement the skipCloseCount counter so that the next time our
+// CloseIdleConnections() wrapper is called, it skips calling the lower
+// level system version that actually closes idle connections.
+
+type retryKey string // avoids compiler warning
+var trsRetryCountKey retryKey = "trsRetryCount"
+
+func (c *trsRoundTripper) trsCheckRetry(ctx context.Context, resp *http.Response, err error) (bool, error) {
+
+	// Skip a retry for this request if it hit one of these specific timeouts
+
+	if err != nil {
+		c.skipCloseMutex.Lock()
+
+		// Skip retries for HTTPClient.Timeout
+		if err.Error() == "net/http: request canceled" {
+			c.skipCloseCount++
+
+			c.skipCloseMutex.Unlock()
+
+			// retryablehttp will close any response bodies on retry skip + error
+
+			return false, err // skip it
+		}
+
+		// Context timeout set by TRS.  No request should retry.
+		if errors.Is(err, context.DeadlineExceeded) {
+			c.skipCloseCount++
+
+			c.skipCloseMutex.Unlock()
+
+			// retryablehttp will close any response bodies on retry skip + error
+
+			return false, err // skip it
+		}
+
+		// Lower level HTTPClient.Timeout triggered timeouts
+		//
+		// Unsure if this is wise so I left it commented out.  If these
+		// happen they don't happen very much so closing all idle
+		// connections when they do happen is not a big deal.
+		//
+		// if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		//     c.skipCloseCount++
+		//
+		//     c.skipCloseMutex.Unlock()
+		//
+		//     wrapperLogger.Errorf("trsCheckRetry: skipCloseCount now %v (ctx timeout)", c.skipCloseCount)
+		//
+		//     // retryablehttp will close any response bodies on retry skip + error
+		//
+		//     return false, err  // skip it
+		// }
+
+		c.skipCloseMutex.Unlock()
+
+	}
+
+	// If none of the above, delegate retry check to retryablehttp
+	shouldRetry, defaultRPErr := retryablehttp.DefaultRetryPolicy(ctx, resp, err)
+
+	// Determine if we should override DefaultRetryPolicy()'s opinion
+	if shouldRetry {
+		// This is our own personal copy of the retry counter for this
+		// request. Let's increment it then compare to the retry limit
+
+		trsWR := ctx.Value(trsRetryCountKey).(*trsWrappedReq)
+		trsWR.retryCount++
+
+		// If the retry limit was reached we do not want to close all idle
+		// connections unnecessarily so imcrement skipCloseCount counter so
+		// that our CloseIdleConnections() wrapper skips the next one
+
+		if trsWR.retryCount > trsWR.retryMax {
+			// If no error present, let's give the caller the underlying
+			// reason why retries were exhausted, if we can determine it
+			if err == nil {
+				if resp != nil {
+					err = fmt.Errorf("retries exhausted: last attempt received status %d (%s)",
+						resp.StatusCode, http.StatusText(resp.StatusCode))
+				} else {
+					err = fmt.Errorf("retries exhausted")
+				}
+			}
+
+			// Skip an idle connection close
+			c.skipCloseMutex.Lock()
+			c.skipCloseCount++
+			c.skipCloseMutex.Unlock()
+
+			// retryablehttp will close any response bodies on retry skip + error
+
+			return false, err
+		}
+	}
+
+	return shouldRetry, defaultRPErr
+}
+
+// Create and configure a new client transport for use with HTTP clients.
+func createClient(task *HttpTask, tloc *TRSHTTPLocal, clientType string) (client *retryablehttp.Client) {
+	// Configure the base transport
+
+	tr := &http.Transport{}
+
+	if clientType == "insecure" {
+		tr.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	} else { // secure
+		tr.TLSClientConfig = &tls.Config{
+			RootCAs: tloc.CACertPool,
+		}
+		tr.TLSClientConfig.BuildNameToCertificate()
+	}
+
+	// Configure base transport policies if requested
+	httpTxPolicy := task.CPolicy.Tx
+	if httpTxPolicy.Enabled {
+		tr.MaxIdleConns = httpTxPolicy.MaxIdleConns                   // if 0 defaults to 100
+		tr.MaxIdleConnsPerHost = httpTxPolicy.MaxIdleConnsPerHost     // if 0 defaults to 2
+		tr.IdleConnTimeout = httpTxPolicy.IdleConnTimeout             // if 0 defaults to no timeout
+		tr.ResponseHeaderTimeout = httpTxPolicy.ResponseHeaderTimeout // if 0 defaults to no timeout
+		tr.TLSHandshakeTimeout = httpTxPolicy.TLSHandshakeTimeout     // if 0 defaults to 10s
+		tr.DisableKeepAlives = httpTxPolicy.DisableKeepAlives         // if 0 defaults to false
+	}
+
+	// Wrap base transport with retryablehttp
+	retryabletr := &trsRoundTripper{
+		transport:                             tr,
+		closeIdleConnectionsFn:                tr.CloseIdleConnections,
+		timeLastClosedOrReachedZeroCloseCount: time.Now(),
+	}
+
+	// Create the httpretryable client and start configuring it
+	client = retryablehttp.NewClient()
+
+	client.HTTPClient.Transport = retryabletr
+
+	// We could set a global http timeout for all users of the client but
+	// that's a bit inflexible.  Let's keep it at the default (unlimited)
+	// and use the user provided context timeout to limit the request.
+	// The context timeout they provide could be different from caller to
+	// caller as well.
+	//
+	//client.HTTPClient.Timeout   = task.Timeout * 9 / 10
+
+	// Wrap httpretryable's DefaultRetryPolicy() so we can override
+	client.CheckRetry = retryabletr.trsCheckRetry
+
+	// Configure the httpretryable client retry count
+	if task.CPolicy.Retry.Retries >= 0 {
+		client.RetryMax = task.CPolicy.Retry.Retries
+	} else {
+		client.RetryMax = DFLT_RETRY_MAX
+	}
+
+	// Configure the httpretryable client backoff timeout
+	if task.CPolicy.Retry.BackoffTimeout > 0 {
+		client.RetryWaitMax = task.CPolicy.Retry.BackoffTimeout
+	} else {
+		client.RetryWaitMax = DFLT_BACKOFF_MAX * time.Second
+	}
+
+	// Log this client's requested configuration and actual configuration
+
+	tloc.Logger.Tracef("Created %s TRS client", clientType)
+	tloc.Logger.Tracef("    CPolicy request:           %v", task.CPolicy)
+	tloc.Logger.Tracef("    RetryMax:                  %v", client.RetryMax)
+	tloc.Logger.Tracef("    RetryWaitMax:              %v", client.RetryWaitMax)
+	tloc.Logger.Tracef("    task.Timeout:              %v", task.Timeout)
+	tloc.Logger.Tracef("    HTTPClient.Timeout:        %v", client.HTTPClient.Timeout)
+
+	if httpTxPolicy.Enabled {
+		tloc.Logger.Tracef("    tx.MaxIdleConns:           %v", tr.MaxIdleConns)
+		tloc.Logger.Tracef("    tx.MaxIdleConnsPerHost:    %v", tr.MaxIdleConnsPerHost)
+		tloc.Logger.Tracef("    tx.IdleConnTimeout:        %v", tr.IdleConnTimeout)
+		tloc.Logger.Tracef("    tx.ResponseHeaderTimeout:  %v", tr.ResponseHeaderTimeout)
+		tloc.Logger.Tracef("    tx.TLSHandshakeTimeout:    %v", tr.TLSHandshakeTimeout)
+		tloc.Logger.Tracef("    tx.DisableKeepAlives:      %v", tr.DisableKeepAlives)
+	}
+
+	tloc.Logger.Tracef("    Client pair count:         %v", len(tloc.clientMap)+1)
+	tloc.Logger.Tracef("    Log level:                 %v", tloc.Logger.GetLevel())
+	tloc.Logger.Tracef("    Go version:                %v", runtime.Version())
+
+	return client
+}
+
+//	Reference:  https://pkg.go.dev/github.com/hashicorp/go-retryablehttp
+
+func ExecuteTask(tloc *TRSHTTPLocal, tct taskChannelTuple) {
+
+	// Find a client to use, or make a new one!
+
+	var cpack *clientPack
+	tloc.clientMutex.Lock()
+	if _, ok := tloc.clientMap[tct.task.CPolicy]; !ok {
+		cpack = new(clientPack)
+
+		cpack.insecure = createClient(tct.task, tloc, "insecure")
+
+		// Do not use leveled logging for now.  See explanation further
+		// up in the source code.  Instead, use standard logger set at
+		// error level to avoid excessive logging
+		//
+		//httpLogger := logrus.New()
+		//httpLogger.SetLevel(tloc.Logger.GetLevel())
+		//retryablehttpLogger := retryablehttp.LeveledLogger(&leveledLogrus{httpLogger})
+		//cpack.insecure.Logger = retryablehttpLogger
+
+		httpLogger := logrus.New()
+		httpLogger.SetLevel(logrus.ErrorLevel)
+		cpack.insecure.Logger = httpLogger
+
+		if tloc.CACertPool != nil {
+			cpack.secure = createClient(tct.task, tloc, "secure")
+
+			//cpack.secure.Logger = retryablehttpLogger
+			cpack.secure.Logger = httpLogger
+		}
+
+		tloc.clientMap[tct.task.CPolicy] = cpack
+	} else {
+		cpack = tloc.clientMap[tct.task.CPolicy]
+	}
+	tloc.clientMutex.Unlock()
+
+	// Found a client to use (or created a new one), now set up a request
+
+	// First validate our task
+	if ok, err := tct.task.Validate(); !ok {
+		tloc.Logger.Errorf("Failed validation of request: %+v, err: %s", tct.task, err)
+		tct.task.Err = &err
+		tct.taskListChannel <- tct.task
+		return
+	}
+
+	// Add user agent header to the request
+	base.SetHTTPUserAgent(tct.task.Request, tloc.svcName)
+
+	// Wrap the request so trsCheckRetry() can keep its own retry count
+	// We'll attach this to the context further below so that it has access
+	// to it
+	trsWR := &trsWrappedReq{
+		orig:       tct.task.Request,        // Core request
+		retryCount: 0,                       // Counter for CLIC()
+		retryMax:   cpack.insecure.RetryMax, // CLIC() will need access to this
+		// same for both secure & insecure
+	}
+
+	// Create child context with timeout and our own retry counter
+
+	ctxTimeout := time.Duration(DFLT_CTX_TIMEOUT * time.Second)
+	if tct.task.Timeout > 0 {
+		ctxTimeout = tct.task.Timeout
+	}
+
+	baseCtx, cancel := context.WithTimeout(tloc.ctx, ctxTimeout)
+	ctxWithValue := context.WithValue(baseCtx, trsRetryCountKey, trsWR)
+
+	tct.task.context = ctxWithValue
+	tct.task.contextCancel = cancel
+
+	// Create a retryablehttp request using the caller's request
+	req, err := retryablehttp.FromRequest(tct.task.Request)
+	if err != nil {
+		tloc.Logger.Errorf("Failed wrapping request with retryablehttp: %v", err)
+		tct.task.Err = &err
+		tct.taskListChannel <- tct.task
+		return
+	}
+
+	// Link retryablehttp's request context to the task's context
+	req.Request = req.Request.WithContext(tct.task.context)
+
+	// Execute the request
+	var tmpError error
+	if tct.task.forceInsecure || tloc.CACertPool == nil || cpack.secure == nil {
+		tloc.Logger.Tracef("Using INSECURE client to send request")
+		tct.task.Request.Response, tmpError = cpack.insecure.Do(req)
+	} else {
+		tloc.Logger.Tracef("Using secure client to send request")
+		tct.task.Request.Response, tmpError = cpack.secure.Do(req)
+
+		// Fall back to insecure only if the enclosing context was not
+		// cancelled or timed out.
+		if tmpError != nil && tct.task.context.Err() == nil {
+			// But first make sure we drain/close the body of the failed
+			// response, if there was one
+			drainAndCloseBody(tct.task.Request.Response)
+
+			tloc.Logger.Warnf("TLS request failed, retrying using INSECURE client (TLS failure: '%v')", tmpError)
+			tct.task.Request.Response, tmpError = cpack.insecure.Do(req)
+		}
+	}
+
+	tct.task.Err = &tmpError
+	if (*tct.task.Err) != nil {
+		tloc.Logger.Tracef("Request failed: %s", (*tct.task.Err).Error())
+	}
+	if tct.task.Request.Response != nil {
+		tloc.Logger.Tracef("Response: %d", tct.task.Request.Response.StatusCode)
+	} else {
+		tloc.Logger.Tracef("No response received")
+	}
+
+	// TODO: Consider cancelling the context for this task here instead of
+	// leaving it up to the caller - Would have to read and close response
+	// here as well
+
+	tct.taskListChannel <- tct.task
+}
+
+// Launch an array of tasks.  This is non-blocking.  The caller can use
+// either the returned Go channel or Check() to check for compleetion.  The
+// caller should close all HTTP response bodies after they are received and
+// processed and close the returned Go channel when done.
+//
+// taskList:  Pointer to a list of HTTP tasks to launch
+//
+// Return:
+//
+// chan:  A Go channel of *HttpTxTask, sized by task list, which caller can
+//        use to get notified of each task's completion. The caller MUST
+//        CLOSE THE CHANNEL WHEN DONE even if using Done() to check for
+//		  completion.
+// error: Nil on success; error string on failure
+
+func (tloc *TRSHTTPLocal) Launch(taskList *[]HttpTask) (chan *HttpTask, error) {
+	if len(*taskList) == 0 {
+		rchan := make(chan *HttpTask, 1)
+		err := fmt.Errorf("Empty task list, nothing to do.")
+		return rchan, err
+	}
+
+	//Set all time stamps
+	taskListChannel := make(chan *HttpTask, len(*taskList))
+
+	for ii := 0; ii < len(*taskList); ii++ {
+		if (*taskList)[ii].Ignore == true {
+			continue
+		}
+
+		//Always set the response to nil; make sure its clean.
+		//Add user-agent header.
+		if (*taskList)[ii].Request != nil {
+			(*taskList)[ii].Request.Response = nil
+			base.SetHTTPUserAgent((*taskList)[ii].Request, tloc.svcName)
+		}
+		//make sure the id is set
+		(*taskList)[ii].SetIDIfNotPopulated()
+
+		//make sure the service name is set
+		if (*taskList)[ii].ServiceName == "" {
+			(*taskList)[ii].ServiceName = tloc.svcName
+		}
+
+		//make sure the timestamp is set
+		if (*taskList)[ii].TimeStamp == "" {
+			(*taskList)[ii].TimeStamp = time.Now().Format(time.RFC3339Nano)
+		}
+
+		//Setup the channel stuff
+		tct := taskChannelTuple{
+			taskListChannel: taskListChannel,
+			task:            &(*taskList)[ii],
+		}
+		tloc.taskMutex.Lock()
+		tloc.taskMap[(*taskList)[ii].id] = &tct
+		tloc.taskMutex.Unlock()
+
+		// pass the Tloc (so it can find a client) + the task channel tuple (so it knows what to do);
+		// let it execute!
+		go ExecuteTask(tloc, tct)
+	}
+
+	tloc.Logger.Tracef("Launch() completed")
+
+	return taskListChannel, nil
+}
+
+// Check the status of the launched task list.  This is an alternative to
+// waiting on the task-complete channel returned by Launch().
+//
+// taskList:  Pointer to the task list
+//
+// Return:
+//
+// bool:  True or false if the task list is still running
+// error: Nil on success; error string on failure
+
+func (tloc *TRSHTTPLocal) Check(taskList *[]HttpTask) (bool, error) {
+	if taskList != nil {
+		for _, v := range *taskList {
+			if v.Ignore == false {
+				if v.Request.Response == nil && v.Err == nil {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
+}
+
+// Check the health of the local HTTP task launch system.
+//
+// Return:
+//
+// bool:  True or false if alive and operational
+// error: Error message associated with non-alive/functional state
+
+func (tloc *TRSHTTPLocal) Alive() (bool, error) {
+	if tloc.taskMap == nil {
+		return false, errors.New("taskMap is nil")
+	}
+	return true, nil
+}
+
+// Cancel a currently-running task set.  Note that this won't kill
+// the individual in-flight tasks, but just kills the overall operation.
+// Thus, for tasks with no time-out which are hung, it could result in
+// a resource leak.   But this can be used to at least wrestle control
+// over a task set.
+//
+// taskList:  Pointer to the task list to cancel
+
+func (tloc *TRSHTTPLocal) Cancel(taskList *[]HttpTask) {
+	if taskList != nil {
+		for _, v := range *taskList {
+			if v.Ignore == false {
+				v.contextCancel()
+			}
+		}
+	}
+	tloc.Logger.Tracef("Cancel() completed")
+}
+
+// Close out a task list transaction.  This frees up resources so it
+// should not be skipped.
+//
+// taskList:  Pointer to the task list to close
+
+func (tloc *TRSHTTPLocal) Close(taskList *[]HttpTask) {
+	if taskList != nil {
+		for _, v := range *taskList {
+			if v.Ignore == false {
+				// The caller should have closed the response body, but we'll also
+				// do it here to prevent resource leaks.  Note that if that was
+				// the case, that connection was closed by the above cancel.
+
+				drainAndCloseBody(v.Request.Response)
+
+				// All tasks must be cancelled to prevent resource leaks.  The
+				// caller may have called Cancel() to prematurely cancel the
+				// operation, but that's probably not a common thing so we will
+				// do it here.  There is no harm in cancelling twice.  We must
+				// do this before closing the response body.
+				//
+				// TODO: We may also want to consider having each go routine
+				// call cancel above in ExecuteTask() for themselves.  Doing it
+				// like that might be less error prone.
+
+				v.contextCancel()
+			}
+			tloc.taskMutex.Lock()
+			delete(tloc.taskMap, v.id)
+			tloc.taskMutex.Unlock()
+
+		}
+	}
+
+	tloc.Logger.Tracef("Close() completed")
+}
+
+// Clean up a local HTTP task system.  This is called when after it will no
+// longer be used.
+
+func (tloc *TRSHTTPLocal) Cleanup() {
+	//Just call the cancel func.
+	tloc.ctxCancelFunc()
+
+	//clean up client map?
+	if tloc.clientMap != nil {
+		for k := range tloc.clientMap {
+			//cancel it first
+			if tloc.clientMap[k].insecure != nil {
+				tloc.clientMap[k].insecure.HTTPClient.CloseIdleConnections()
+			}
+			if tloc.clientMap[k].secure != nil {
+				tloc.clientMap[k].secure.HTTPClient.CloseIdleConnections()
+			}
+			//delete it out of the map
+			tloc.clientMutex.Lock()
+			delete(tloc.clientMap, k)
+			tloc.clientMutex.Unlock()
+		}
+	}
+
+	//clean up task map
+	if tloc.taskMap != nil {
+		for k := range tloc.taskMap {
+			//cancel it first
+			tloc.taskMap[k].task.contextCancel()
+			//close the channel
+			close(tloc.taskMap[k].taskListChannel)
+			//delete it out of the map
+			tloc.taskMutex.Lock()
+			delete(tloc.taskMap, k)
+			tloc.taskMutex.Unlock()
+		}
+	}
+	tloc.Logger.Tracef("Cleanup() completed")
+	// this really just a big red button to STOP ALL? b/c im not clearing any memory
+}

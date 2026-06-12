@@ -29,12 +29,12 @@ import (
 	"time"
 
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
-	"github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 
 	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
 	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
 	"github.com/OpenCHAMI/power-control/v2/internal/logger"
 	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/OpenCHAMI/power-control/v2/internal/taskrun"
 )
 
 var GLOB *DOMAIN_GLOBALS
@@ -45,9 +45,9 @@ func Init(glob *DOMAIN_GLOBALS) {
 
 type DOMAIN_GLOBALS struct {
 	CAUri            string
-	BaseTRSTask      *trs_http_api.HttpTask
-	RFTloc           *trs_http_api.TrsAPI
-	HSMTloc          *trs_http_api.TrsAPI
+	BaseTRSTask      *taskrun.HttpTask
+	RFTloc           *taskrun.TrsAPI
+	HSMTloc          *taskrun.TrsAPI
 	RFClientLock     *sync.RWMutex
 	Running          *bool
 	DSP              *storage.StorageProvider
@@ -63,9 +63,9 @@ type DOMAIN_GLOBALS struct {
 	PodName          string
 }
 
-func (g *DOMAIN_GLOBALS) NewGlobals(base *trs_http_api.HttpTask,
-	tlocRF *trs_http_api.TrsAPI,
-	tlocSVC *trs_http_api.TrsAPI,
+func (g *DOMAIN_GLOBALS) NewGlobals(base *taskrun.HttpTask,
+	tlocRF *taskrun.TrsAPI,
+	tlocSVC *taskrun.TrsAPI,
 	clientRF *hms_certs.HTTPClientPair,
 	clientSVC *hms_certs.HTTPClientPair,
 	rfClientLock *sync.RWMutex,
