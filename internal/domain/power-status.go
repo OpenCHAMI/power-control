@@ -1140,7 +1140,7 @@ func updateSmdPowerState(updatedComponents []pcsmodel.PowerStatusComponent) erro
 			continue
 		}
 
-		err := (*hsmHandle).BulkComponentStateUpdate(components, state)
+		err := hsmHandle.BulkComponentStateUpdate(components, state)
 		if err != nil {
 			return fmt.Errorf("Error performing SMD bulk state update: %v", err)
 		}
