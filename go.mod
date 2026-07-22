@@ -10,7 +10,7 @@ require (
 	github.com/Cray-HPE/hms-compcredentials v1.15.0
 	github.com/Cray-HPE/hms-hmetcd v1.13.0
 	github.com/Cray-HPE/hms-securestorage v1.17.0
-	github.com/Cray-HPE/hms-trs-app-api/v3 v3.0.5
+	github.com/Cray-HPE/hms-trs-app-api/v3 v3.0.6
 	github.com/Cray-HPE/hms-xname v1.4.0
 	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18
 	github.com/OpenCHAMI/smd/v2 v2.19.1
@@ -42,7 +42,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/confluentinc/confluent-kafka-go/v2 v2.10.0 // indirect
+	github.com/confluentinc/confluent-kafka-go/v2 v2.10.1 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
