@@ -12,6 +12,8 @@ github.com/Cray-HPE/hms-base/v2 v2.3.0 h1:BjUWnxHplxg+YqjHaEcFH6TvsFb6cqYN3WI2JA
 github.com/Cray-HPE/hms-base/v2 v2.3.0/go.mod h1:vE93SJ+Dptk1Y5+C/DKJPt/tjCZs3HzZUbZaEnfgnug=
 github.com/Cray-HPE/hms-certs v1.7.0 h1:iNzKUJMRImKC+2IVx8vYiPD6ii95AQoZx9Y+DAbJgtk=
 github.com/Cray-HPE/hms-certs v1.7.0/go.mod h1:OJ1pVX7rnA7fwBcucbFLq00Cf/2k4V6lDyOuROh8Hs4=
+github.com/Cray-HPE/hms-certs v1.7.1 h1:dsSE/iL8N9rNgROEVRb2zzjYUHNOoqMoDa+kpHFda64=
+github.com/Cray-HPE/hms-certs v1.7.1/go.mod h1:M3bzIfQwblOXZ3DGZoeXYqvY9t9YTVaqFOlO5FoQEfg=
 github.com/Cray-HPE/hms-compcredentials v1.15.0 h1:ao3oWw/+yo9rrRpUOpVfew7kyLhraXJWd24/HXVmJT4=
 github.com/Cray-HPE/hms-compcredentials v1.15.0/go.mod h1:Qofdt6WFcY97J6V4nGEDfFSxIE9ZZJzoZDsTBfjQ2RY=
 github.com/Cray-HPE/hms-hmetcd v1.13.0 h1:CYf/rrzsfscEk06kmqju2cV/mI0XCZUAPEX+axZuQeY=

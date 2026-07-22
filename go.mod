@@ -6,7 +6,7 @@ go 1.25.0
 
 require (
 	github.com/Cray-HPE/hms-base/v2 v2.3.0
-	github.com/Cray-HPE/hms-certs v1.7.0
+	github.com/Cray-HPE/hms-certs v1.7.1
 	github.com/Cray-HPE/hms-compcredentials v1.15.0
 	github.com/Cray-HPE/hms-hmetcd v1.13.0
 	github.com/Cray-HPE/hms-securestorage v1.17.0
