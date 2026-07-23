@@ -17,7 +17,7 @@ services:
     networks:
       - pcs
   dummy:
-    image: docker.io/alpine:3.13
+    image: docker.io/alpine:3.24
     depends_on:
       - etcd
       - smd
