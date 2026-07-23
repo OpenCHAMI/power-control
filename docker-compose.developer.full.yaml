@@ -77,7 +77,7 @@ services:
     networks:
       - pcs
   smd-init:
-    image: ghcr.io/openchami/smd:2.19
+    image: ghcr.io/openchami/smd:2.20
     environment:
       - SMD_DBHOST=postgres
       - SMD_DBPORT=5432
@@ -91,7 +91,7 @@ services:
       - pcs
     command: /smd-init
   smd:
-    image: ghcr.io/openchami/smd:2.19
+    image: ghcr.io/openchami/smd:2.20
     environment:
       - SMD_DBHOST=postgres
       - SMD_DBPORT=5432
