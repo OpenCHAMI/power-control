@@ -34,7 +34,7 @@ jobs:
           API_TARGET_URLS: "{pcs_base_url}"
       - name: Render job summary
         id: template
-        uses: chuhlomin/render-template@v1.6
+        uses: chuhlomin/render-template@v1.12
         with:
           template: ./.github/workflows/coverage_summary.md.tpl
           vars_path: ./data/output/job_summary_template_values.yaml
