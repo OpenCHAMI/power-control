@@ -20,7 +20,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lestrrat-go/jwx v1.2.31
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.12.3
 	github.com/openchami/chi-middleware/auth v0.0.0-20240812224658-b16b83c70700
 	github.com/openchami/chi-middleware/log v0.0.0-20240812224658-b16b83c70700
 	github.com/rs/zerolog v1.33.0
