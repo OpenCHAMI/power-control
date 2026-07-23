@@ -110,7 +110,7 @@ services:
     networks:
       - pcs
   kafka:
-    image: confluentinc/cp-kafka:7.8.0
+    image: confluentinc/cp-kafka:7.9.8
     hostname: kafka
     depends_on:
       - zookeeper
