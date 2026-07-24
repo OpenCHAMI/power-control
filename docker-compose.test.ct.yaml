@@ -43,7 +43,7 @@ services:
 
   postgres-smd:
     hostname: postgres-smd
-    image: docker.io/library/postgres:11-alpine
+    image: docker.io/library/postgres:18-alpine
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
@@ -297,7 +297,7 @@ services:
 
   postgres-pcs:
     hostname: postgres-pcs
-    image: docker.io/library/postgres:11-alpine
+    image: docker.io/library/postgres:18-alpine
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
