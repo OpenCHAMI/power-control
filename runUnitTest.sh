@@ -62,10 +62,18 @@ openssl req -newkey rsa:4096 \
 chmod o+r $ephCertDir/rts.crt $ephCertDir/rts.key
 
 echo "Starting containers..."
-docker compose build
-docker compose up  -d dummy #we use dummy to make sure all our dependencies are up
+if ! docker compose build; then
+  echo "Failed to build unit-test containers!"
+  cleanup 1
+fi
+
+if ! docker compose up -d dummy; then # we use dummy to make sure all our dependencies are ready
+  echo "Failed to start unit-test dependencies!"
+  cleanup 1
+fi
+
 docker compose ps # To improve debuggability display the current state of the conainers.
-docker compose up --exit-code-from unit-tests unit-tests
+docker compose up --no-deps --exit-code-from unit-tests unit-tests
 
 test_result=$?
 

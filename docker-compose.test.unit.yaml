@@ -1,6 +1,13 @@
 networks:
   pcs:
 
+x-rfemulator-healthcheck: &rfemulator-healthcheck
+  test: ["CMD", "curl", "--fail", "--silent", "--insecure", "https://127.0.0.1/redfish/v1/"]
+  interval: 2s
+  timeout: 2s
+  retries: 30
+  start_period: 5s
+
 services:
   unit-tests:
     build:
@@ -12,17 +19,27 @@ services:
       - VAULT_KEYPATH=hms-creds
       - STORAGE
     depends_on:
-      - etcd
-      - smd
+      etcd:
+        condition: service_healthy
+      smd:
+        condition: service_healthy
+      emulator-loader:
+        condition: service_completed_successfully
+      vault-kv-enabler:
+        condition: service_completed_successfully
     networks:
       - pcs
   dummy:
     image: docker.io/alpine:3.24
     depends_on:
-      - etcd
-      - smd
-      - emulator-loader
-      - vault-kv-enabler
+      etcd:
+        condition: service_healthy
+      smd:
+        condition: service_healthy
+      emulator-loader:
+        condition: service_completed_successfully
+      vault-kv-enabler:
+        condition: service_completed_successfully
     networks:
       - pcs
   etcd:
@@ -32,6 +49,12 @@ services:
       - ALLOW_NONE_AUTHENTICATION=yes
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
       - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     networks:
       - pcs
   vault:
@@ -45,6 +68,12 @@ services:
       - "8200:8200"
     cap_add:
       - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     networks:
       - pcs
   vault-kv-enabler:
@@ -56,7 +85,8 @@ services:
       - VAULT_TOKEN=hms
       - KV_STORES=hms-creds
     depends_on:
-      - vault
+      vault:
+        condition: service_healthy
     networks:
       - pcs
   postgres:
@@ -66,6 +96,12 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_DB=hmsds
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     networks:
       - pcs
   smd-init:
@@ -78,7 +114,8 @@ services:
       - SMD_DBPASS=${POSTGRES_PASSWORD:-postgres}
       - SMD_DBOPTS=sslmode=disable
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - pcs
     command: /smd-init
@@ -109,8 +146,16 @@ services:
       - ./configs/token:/configs/token
     hostname: smd
     depends_on:
-      - smd-init
-      - vault
+      smd-init:
+        condition: service_completed_successfully
+      vault-kv-enabler:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:27779/hsm/v2/service/ready"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     ports:
       - "27779:27779"
     networks:
@@ -143,8 +188,9 @@ services:
   emulator-loader:
     image: docker.io/library/golang:1.26-alpine
     command: >
-      sh -c "apk add curl && sleep 10 &&
-      curl -X POST -d '{\"RedfishEndpoints\":[{
+      sh -ec "apk add --no-cache curl &&
+      curl --fail --show-error --silent
+      -H 'Content-Type: application/json' -X POST -d '{\"RedfishEndpoints\":[{
         \"ID\":\"x0c0b0\",
         \"FQDN\":\"x0c0b0\",
         \"RediscoverOnUpdate\":true,
@@ -169,11 +215,18 @@ services:
         \"User\":\"root\",
         \"Password\":\"root_password\"}]}' http://smd:27779/hsm/v2/Inventory/RedfishEndpoints"
     depends_on:
-      - smd
-      - rfemulator0
-      - rfemulator1
-      - rfemulator2
-      - rfemulator3
+      smd:
+        condition: service_healthy
+      vault-kv-enabler:
+        condition: service_completed_successfully
+      rfemulator0:
+        condition: service_healthy
+      rfemulator1:
+        condition: service_healthy
+      rfemulator2:
+        condition: service_healthy
+      rfemulator3:
+        condition: service_healthy
     networks:
       - pcs
 
@@ -185,6 +238,7 @@ services:
       - XNAME=x0c0b0
       # - "AUTH_CONFIG=root:root_password:Administrator"
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     ports:
       - "5004:443"
     networks:
@@ -201,6 +255,7 @@ services:
       - XNAME=x0c0s1b0
       # - "AUTH_CONFIG=root:root_password:Administrator"
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     ports:
       - "5001:443"
     networks:
@@ -217,6 +272,7 @@ services:
       - XNAME=x0c0s2b0
       # - "AUTH_CONFIG=root:root_password:Administrator"
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     ports:
       - "5002:443"
     networks:
@@ -232,6 +288,7 @@ services:
       - XNAME=x0c0r2b0
       # - "AUTH_CONFIG=root:root_password:Administrator"
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     ports:
       - "5003:443"
     networks:
