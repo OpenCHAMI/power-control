@@ -42,24 +42,63 @@ function cleanup() {
   exit $1
 }
 
+function wait_for_pcs() {
+  local max_attempts=30
+  local container_id state health attempt
+
+  container_id=$(docker compose ps -q power-control)
+  if [[ -z $container_id ]]; then
+    echo "No Power Control container found"
+    return 1
+  fi
+
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    state=$(docker inspect --format '{{.State.Status}}' "$container_id" 2>/dev/null || true)
+    health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null || true)
+
+    if [[ $health == "healthy" ]]; then
+      echo "Power Control is healthy"
+      return 0
+    fi
+    if [[ $state == "exited" || $state == "dead" ]]; then
+      echo "Power Control stopped before becoming healthy (state: $state)"
+      return 1
+    fi
+
+    echo "Waiting for Power Control to become healthy ($attempt/$max_attempts; state: $state, health: $health)..."
+    sleep 2
+  done
+
+  echo "Timed out waiting for Power Control to become healthy"
+  return 1
+}
+
 
 # Get the base containers running
 echo "Starting containers..."
-docker compose build --no-cache
-docker compose up -d power-control
+if ! docker compose build --no-cache; then
+  echo "Failed to build CT containers!"
+  cleanup 1
+fi
 
-sleep 15
+if ! docker compose up -d power-control; then
+  echo "Failed to start CT environment!"
+  cleanup 1
+fi
 
-docker compose logs power-control
+if ! wait_for_pcs; then
+  echo "Power Control did not become ready!"
+  cleanup 1
+fi
 
 # execute the CT smoke tests
-if ! docker compose up --no-recreate --exit-code-from smoke smoke; then
+if ! docker compose up --no-deps --no-recreate --exit-code-from smoke smoke; then
   echo "CT smoke tests FAILED!"
   cleanup 1
 fi
 
 # execute the CT Tavern tests
-if ! docker compose up --exit-code-from tavern tavern; then
+if ! docker compose up --no-deps --exit-code-from tavern tavern; then
   echo "CT tavern tests FAILED!"
   cleanup 1
 fi

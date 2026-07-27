@@ -1,6 +1,13 @@
 networks:
   pcs:
 
+x-rfemulator-healthcheck: &rfemulator-healthcheck
+  test: ["CMD", "curl", "--fail", "--silent", "--insecure", "https://127.0.0.1/redfish/v1/"]
+  interval: 2s
+  timeout: 2s
+  retries: 30
+  start_period: 5s
+
 services:
 
   #
@@ -13,6 +20,12 @@ services:
       - ALLOW_NONE_AUTHENTICATION=yes
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
       - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     networks:
       - pcs
 
@@ -25,6 +38,12 @@ services:
       - VAULT_ADDR=http://127.0.0.1:8200
     cap_add:
       - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     networks:
       - pcs
 
@@ -37,7 +56,8 @@ services:
       - VAULT_TOKEN=hms
       - KV_STORES=hms-creds
     depends_on:
-      - vault
+      vault:
+        condition: service_healthy
     networks:
       - pcs
 
@@ -48,6 +68,12 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_DB=hmsds
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     networks:
       - pcs
 
@@ -61,7 +87,8 @@ services:
       - SMD_DBPASS=${POSTGRES_PASSWORD:-postgres}
       - SMD_DBOPTS=sslmode=disable
     depends_on:
-      - postgres-smd
+      postgres-smd:
+        condition: service_healthy
     networks:
       - pcs
     command: /smd-init
@@ -93,8 +120,16 @@ services:
       - ./configs/token:/configs/token
     hostname: smd
     depends_on:
-      - smd-init
-      - vault
+      smd-init:
+        condition: service_completed_successfully
+      vault-kv-enabler:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:27779/hsm/v2/service/ready"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     networks:
       - pcs
 
@@ -109,8 +144,9 @@ services:
   emulator-loader:
     image: docker.io/library/golang:1.26-alpine
     command: >
-      sh -c "apk add curl && sleep 10 &&
-      curl -X POST -d '{\"RedfishEndpoints\":[{
+      sh -ec "apk add --no-cache curl &&
+      curl --fail --show-error --silent
+      -H 'Content-Type: application/json' -X POST -d '{\"RedfishEndpoints\":[{
         \"ID\":\"x0c0b0\",
         \"FQDN\":\"x0c0b0\",
         \"RediscoverOnUpdate\":true,
@@ -166,16 +202,28 @@ services:
         \"Password\":\"root_password\"
       }]}' http://smd:27779/hsm/v2/Inventory/RedfishEndpoints"
     depends_on:
-      - smd
-      - rfemulator0
-      - rfemulator1
-      - rfemulator2
-      - rfemulator3
-      - rfemulator4
-      - rfemulator5
-      - rfemulator6
-      - rfemulator7
-      - rfemulator8
+      smd:
+        condition: service_healthy
+      vault-kv-enabler:
+        condition: service_completed_successfully
+      rfemulator0:
+        condition: service_healthy
+      rfemulator1:
+        condition: service_healthy
+      rfemulator2:
+        condition: service_healthy
+      rfemulator3:
+        condition: service_healthy
+      rfemulator4:
+        condition: service_healthy
+      rfemulator5:
+        condition: service_healthy
+      rfemulator6:
+        condition: service_healthy
+      rfemulator7:
+        condition: service_healthy
+      rfemulator8:
+        condition: service_healthy
     networks:
       - pcs
 
@@ -187,6 +235,7 @@ services:
       - MAC_SCHEMA=Mountain
       - XNAME=x0c0s0b0
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     networks:
       pcs:
         aliases:
@@ -200,6 +249,7 @@ services:
       - MAC_SCHEMA=Mountain
       - XNAME=x0c0s1b0
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     networks:
       pcs:
         aliases:
@@ -213,6 +263,7 @@ services:
       - MAC_SCHEMA=Mountain
       - XNAME=x0c0s2b0
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     networks:
       pcs:
         aliases:
@@ -226,6 +277,7 @@ services:
       - MAC_SCHEMA=Mountain
       - XNAME=x0c0s3b0
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     networks:
       pcs:
         aliases:
@@ -239,6 +291,7 @@ services:
       - MAC_SCHEMA=Mountain
       - XNAME=x0c0s4b0
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     networks:
       pcs:
         aliases:
@@ -252,6 +305,7 @@ services:
       - MAC_SCHEMA=Mountain
       - XNAME=x0c0s5b0
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     networks:
       pcs:
         aliases:
@@ -265,6 +319,7 @@ services:
       - MAC_SCHEMA=Mountain
       - XNAME=x0c0s6b0
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     networks:
       pcs:
         aliases:
@@ -278,6 +333,7 @@ services:
       - MAC_SCHEMA=Mountain
       - XNAME=x0c0s7b0
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     networks:
       pcs:
         aliases:
@@ -290,6 +346,7 @@ services:
       - MOCKUPFOLDER=CMM
       - XNAME=x0c0b0
       - PORT=443
+    healthcheck: *rfemulator-healthcheck
     networks:
       pcs:
         aliases:
@@ -302,6 +359,12 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_DB=pcsdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     networks:
       - pcs
 
@@ -316,7 +379,8 @@ services:
       - POSTGRES_HOST=postgres-pcs
       - POSTGRES_INSECURE=1
     depends_on:
-      - postgres-pcs # needed to initialize PCS
+      postgres-pcs:
+        condition: service_healthy
     networks:
       - pcs
 
@@ -350,12 +414,24 @@ services:
       - PCS_POWER_SAMPLE_INTERVAL=5
       - STORAGE=${STORAGE:-ETCD}
     depends_on:
-      - etcd # needed to bring up PCS
-      - smd # needed to bring up PCS
-      - vault-kv-enabler # needed for discovery of emulated hardware to succeed
-      - emulator-loader # needed to bring up emulated hardware
-      - wait-for-smd # needed to give PCS time for its initial hardware scan
-      - power-control-init # needed to initialize PCS
+      etcd:
+        condition: service_healthy
+      smd:
+        condition: service_healthy
+      vault-kv-enabler:
+        condition: service_completed_successfully
+      emulator-loader:
+        condition: service_completed_successfully
+      wait-for-smd:
+        condition: service_completed_successfully
+      power-control-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:28007/readiness"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
     networks:
       - pcs
 
@@ -366,6 +442,11 @@ services:
     build:
       context: test/ct/
       dockerfile: Dockerfile.wait-for-smd.Dockerfile
+    depends_on:
+      smd:
+        condition: service_healthy
+      emulator-loader:
+        condition: service_completed_successfully
     networks:
       - pcs
 
@@ -374,6 +455,9 @@ services:
       context: test/ct/
       dockerfile: Dockerfile
     entrypoint: entrypoint.sh tavern -c /src/app/tavern_global_config_ct_test_emulated_hardware.yaml -p /src/app/api
+    depends_on:
+      power-control:
+        condition: service_healthy
     networks:
       - pcs
 
@@ -382,5 +466,8 @@ services:
       context: test/ct/
       dockerfile: Dockerfile
     entrypoint: entrypoint.sh smoke -f /src/app/smoke.json -u http://power-control:28007
+    depends_on:
+      power-control:
+        condition: service_healthy
     networks:
       - pcs
