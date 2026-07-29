@@ -1,6 +1,6 @@
 module github.com/OpenCHAMI/power-control/v2
 
-go 1.25.0
+go 1.26.0
 
 //todo hms-base needs to be converted to hms-xname as soon as that package is available.
 
@@ -20,6 +20,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lestrrat-go/jwx/v3 v3.2.0
+	github.com/lestrrat-go/jwx/v4 v4.2.0
 	github.com/lib/pq v1.12.3
 	github.com/openchami/chi-middleware/auth v0.0.0-20240812224658-b16b83c70700
 	github.com/openchami/chi-middleware/log v0.0.0-20240812224658-b16b83c70700
