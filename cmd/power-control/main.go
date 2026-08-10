@@ -27,8 +27,8 @@ package main
 import (
 	"os"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/openchami/power-control/v2/internal/logger"
+	"github.com/openchami/power-control/v2/internal/storage"
 )
 
 func main() {

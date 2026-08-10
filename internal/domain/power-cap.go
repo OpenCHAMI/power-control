@@ -42,9 +42,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"github.com/openchami/power-control/v2/internal/hsm"
+	"github.com/openchami/power-control/v2/internal/logger"
+	"github.com/openchami/power-control/v2/internal/model"
 )
 
 ///////////////////////////

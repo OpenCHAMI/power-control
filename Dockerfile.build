@@ -33,7 +33,7 @@ WORKDIR /workspace
 # copy the same set of files. Enforcing pkg/ and internal/ only across
 # the board would maybe help.
 # Original also had this copying to GOPATH, e.g.
-# COPY cmd $GOPATH/src/github.com/OpenCHAMI/power-control/v2/cmd
+# COPY cmd $GOPATH/src/github.com/openchami/power-control/v2/cmd
 # I've encountered enough Dockerfiles that just copy it to workdir
 COPY cmd cmd
 COPY api api

@@ -7,7 +7,7 @@ import (
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"github.com/openchami/power-control/v2/internal/model"
 )
 
 // TestPowerCapTaskGetSet tests setting and getting a single power cap task.

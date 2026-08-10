@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/openchami/power-control/v2/internal/storage"
 )
 
 // add environment variable usage to the command flags

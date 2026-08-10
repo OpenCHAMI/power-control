@@ -8,8 +8,8 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/openchami/power-control/v2/internal/logger"
+	"github.com/openchami/power-control/v2/internal/storage"
 )
 
 // Application and schema versioning

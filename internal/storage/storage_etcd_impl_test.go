@@ -28,8 +28,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"github.com/openchami/power-control/v2/internal/logger"
+	"github.com/openchami/power-control/v2/internal/model"
 )
 
 func TestPageLocations(t *testing.T) {

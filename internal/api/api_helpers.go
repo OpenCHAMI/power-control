@@ -30,8 +30,8 @@ import (
 	"github.com/google/uuid"
 	logrus "github.com/sirupsen/logrus"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"github.com/openchami/power-control/v2/internal/logger"
+	"github.com/openchami/power-control/v2/internal/model"
 )
 
 type IDList struct {

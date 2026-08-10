@@ -14,7 +14,7 @@ import (
 	pq "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"github.com/openchami/power-control/v2/internal/model"
 )
 
 type PostgresConfig struct {
