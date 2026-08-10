@@ -41,10 +41,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
-	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
-	pcsmodel "github.com/OpenCHAMI/power-control/v2/internal/model"
-	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/openchami/power-control/v2/internal/credstore"
+	"github.com/openchami/power-control/v2/internal/hsm"
+	pcsmodel "github.com/openchami/power-control/v2/internal/model"
+	"github.com/openchami/power-control/v2/internal/storage"
 )
 
 type PwrStat_TS struct {

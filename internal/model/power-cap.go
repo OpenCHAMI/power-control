@@ -30,7 +30,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
+	"github.com/openchami/power-control/v2/internal/hsm"
 )
 
 ///////////////////////////

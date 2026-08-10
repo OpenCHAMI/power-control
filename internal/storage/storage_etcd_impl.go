@@ -38,7 +38,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"github.com/openchami/power-control/v2/internal/model"
 )
 
 // This file contains interface functions for the ETCD implementation of PCS

@@ -1,4 +1,4 @@
-module github.com/OpenCHAMI/power-control/v2
+module github.com/openchami/power-control/v2
 
 go 1.25.0
 

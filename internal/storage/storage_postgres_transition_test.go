@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/exp/slices"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"github.com/openchami/power-control/v2/internal/model"
 )
 
 // TestTransitionSetGet tests setting and getting a single transition with several attached tasks.

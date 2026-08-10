@@ -37,10 +37,10 @@ import (
 	"github.com/Cray-HPE/hms-xname/xnametypes"
 	rf "github.com/OpenCHAMI/smd/v2/pkg/redfish"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
-	pcshsm "github.com/OpenCHAMI/power-control/v2/internal/hsm"
-	pcsmodel "github.com/OpenCHAMI/power-control/v2/internal/model"
-	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/openchami/power-control/v2/internal/credstore"
+	pcshsm "github.com/openchami/power-control/v2/internal/hsm"
+	pcsmodel "github.com/openchami/power-control/v2/internal/model"
+	"github.com/openchami/power-control/v2/internal/storage"
 
 	"github.com/sirupsen/logrus"
 )

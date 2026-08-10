@@ -17,12 +17,12 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/api"
-	"github.com/OpenCHAMI/power-control/v2/internal/credstore"
-	"github.com/OpenCHAMI/power-control/v2/internal/domain"
-	"github.com/OpenCHAMI/power-control/v2/internal/hsm"
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
-	"github.com/OpenCHAMI/power-control/v2/internal/storage"
+	"github.com/openchami/power-control/v2/internal/api"
+	"github.com/openchami/power-control/v2/internal/credstore"
+	"github.com/openchami/power-control/v2/internal/domain"
+	"github.com/openchami/power-control/v2/internal/hsm"
+	"github.com/openchami/power-control/v2/internal/logger"
+	"github.com/openchami/power-control/v2/internal/storage"
 )
 
 // Default Port to use

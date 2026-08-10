@@ -31,7 +31,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/model"
+	"github.com/openchami/power-control/v2/internal/model"
 )
 
 type EtcdTestSettings struct {

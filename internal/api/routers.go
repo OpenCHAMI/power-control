@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/OpenCHAMI/power-control/v2/internal/logger"
+	"github.com/openchami/power-control/v2/internal/logger"
 
 	jwtauth "github.com/OpenCHAMI/jwtauth/v5"
 	"github.com/go-chi/chi/v5"
