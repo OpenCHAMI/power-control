@@ -12,7 +12,7 @@ require (
 	github.com/Cray-HPE/hms-securestorage v1.18.0
 	github.com/Cray-HPE/hms-trs-app-api/v3 v3.0.6
 	github.com/Cray-HPE/hms-xname v1.4.0
-	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18
+	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20260729162818-d6b185bd9ebc
 	github.com/OpenCHAMI/smd/v2 v2.20.4
 	github.com/go-chi/chi/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
