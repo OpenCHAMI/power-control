@@ -142,7 +142,7 @@ services:
   # that fit this criteria. Otherwise test failures may occur.
   #
   emulator-loader:
-    image: docker.io/library/golang:1.26-alpine
+    image: docker.io/library/golang:1.27-alpine
     command: >
       sh -ec "apk add --no-cache curl &&
       curl --fail --show-error --silent
