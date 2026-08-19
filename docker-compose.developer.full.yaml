@@ -173,7 +173,7 @@ services:
   # Emulator
   #
   emulator-loader:
-    image: library/golang:1.26-alpine
+    image: library/golang:1.27-alpine
     platform: linux/arm64
     command: >
       sh -c "apk add curl && sleep 10 &&
