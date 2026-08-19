@@ -22,7 +22,7 @@
 
 # This file only exists as a means to run tests in an automated fashion.
 
-FROM docker.io/library/golang:1.26-alpine
+FROM docker.io/library/golang:1.27-alpine
 
 RUN set -ex \
     && apk -U upgrade \
