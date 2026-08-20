@@ -1,6 +1,6 @@
 module github.com/openchami/power-control/v2
 
-go 1.25.0
+go 1.26.0
 
 //todo hms-base needs to be converted to hms-xname as soon as that package is available.
 
@@ -31,7 +31,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/etcd v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.44.0
-	golang.org/x/exp v0.0.0-20260727155853-b88d891fe743
+	golang.org/x/exp v0.0.0-20260820142414-ca536658362e
 	golang.org/x/oauth2 v0.36.0
 )
 
