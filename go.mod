@@ -27,7 +27,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/etcd v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.44.0
@@ -42,6 +42,7 @@ require (
 	github.com/moby/moby/api v1.55.0 // indirect
 	github.com/moby/moby/client v0.5.0 // indirect
 	github.com/valyala/fastjson v1.6.10 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 )
 
 require (
