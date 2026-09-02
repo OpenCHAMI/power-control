@@ -32,8 +32,6 @@ github.com/Microsoft/hcsshim v0.11.5 h1:haEcLNpj9Ka1gd3B3tAEs9CpE0c+1IhoL59w/exY
 github.com/Microsoft/hcsshim v0.11.5/go.mod h1:MV8xMfmECjl5HdO7U/3/hFVnkmSBjAjmA09d4bExKcU=
 github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18 h1:oBPtXp9RVm9lk5zTmDLf+Vh21yDHpulBxUqGJQjwQCk=
 github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18/go.mod h1:ggNHWgLfW/WRXcE8ZZC4S7UwHif16HVmyowOCWdNSN8=
-github.com/OpenCHAMI/smd/v2 v2.20.4 h1:vErSwjl/pWljITDtcW4Pxcr4pvtlGTIiBnXAOOwaf/w=
-github.com/OpenCHAMI/smd/v2 v2.20.4/go.mod h1:whW2AjXZcv2Zma1s+o61OdInc30/R35MG4q6aTEnUug=
 github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d h1:licZJFw2RwpHMqeKTCYkitsPqHNxTmd4SNR5r94FGM8=
 github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d/go.mod h1:asat636LX7Bqt5lYEZ27JNDcqxfjdBQuJ/MM4CN/Lzo=
 github.com/aws/aws-sdk-go-v2 v1.26.1 h1:5554eUqIYVWpU0YmeeYZ0wU64H2VLBs8TlhRB2L+EkA=
@@ -209,8 +207,8 @@ github.com/hashicorp/go-hclog v1.6.3 h1:Qr2kF+eVWjTiYmU7Y31tYlP1h0q/X3Nl3tPGdaB1
 github.com/hashicorp/go-hclog v1.6.3/go.mod h1:W4Qnvbt70Wk/zYJryRzDRU/4r0kIg0PVHBcfoyhpF5M=
 github.com/hashicorp/go-multierror v1.1.1 h1:H5DkEtf6CXdFp0N0Em5UCwQpXMWke8IA0+lD48awMYo=
 github.com/hashicorp/go-multierror v1.1.1/go.mod h1:iw975J/qwKPdAO1clOe2L8331t/9/fmwbPZ6JB6eMoM=
-github.com/hashicorp/go-retryablehttp v0.7.7 h1:C8hUCYzor8PIfXHa4UrZkU4VvK8o9ISHxT2Q8+VepXU=
-github.com/hashicorp/go-retryablehttp v0.7.7/go.mod h1:pkQpWZeYWskR+D1tR2O5OcBFOxfA7DoAO6xtkuQnHTk=
+github.com/hashicorp/go-retryablehttp v0.7.8 h1:ylXZWnqa7Lhqpk0L1P1LzDtGcCR0rPVUrx/c8Unxc48=
+github.com/hashicorp/go-retryablehttp v0.7.8/go.mod h1:rjiScheydd+CxvumBsIrFKlx3iS0jrZ7LvzFGFmuKbw=
 github.com/hashicorp/go-rootcerts v1.0.2 h1:jzhAVGtqPKbwpyCPELlgNWhE1znq+qwJtW5Oi2viEzc=
 github.com/hashicorp/go-rootcerts v1.0.2/go.mod h1:pqUvnprVnM5bf7AOirdbb01K4ccR319Vf4pU3K5EGc8=
 github.com/hashicorp/go-secure-stdlib/parseutil v0.2.0 h1:U+kC2dOhMFQctRfhK0gRctKAPTloZdMU5ZJxaesJ/VM=
@@ -356,6 +354,8 @@ github.com/openchami/chi-middleware/auth v0.0.0-20240812224658-b16b83c70700 h1:X
 github.com/openchami/chi-middleware/auth v0.0.0-20240812224658-b16b83c70700/go.mod h1:kswb9kU5cZAFRAvf1dAUJRWbQyjDEb0qkxW4ncDdEXg=
 github.com/openchami/chi-middleware/log v0.0.0-20240812224658-b16b83c70700 h1:Gzt5f6RK39CHvY3SJudzBb/RK4tVh/S3CpJ0eQlbNdg=
 github.com/openchami/chi-middleware/log v0.0.0-20240812224658-b16b83c70700/go.mod h1:UuXvr2loD4MtvZeKr57W0WpBs+gm0KM1kdtcXrE8M6s=
+github.com/openchami/smd/v2 v2.20.5 h1:iMtQKKUYJ3HoRXmlHcFLitOlSBzYfYzAe1GN0Y8dtFA=
+github.com/openchami/smd/v2 v2.20.5/go.mod h1:tHfLrOXbD0jb34smGR0+wwiK8A/CXA+lqN11JVYb6K8=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=

@@ -35,9 +35,9 @@ import (
 	"time"
 
 	base "github.com/Cray-HPE/hms-base/v2"
-	rf "github.com/OpenCHAMI/smd/v2/pkg/redfish"
-	reservation "github.com/OpenCHAMI/smd/v2/pkg/service-reservations"
-	"github.com/OpenCHAMI/smd/v2/pkg/sm"
+	rf "github.com/openchami/smd/v2/pkg/redfish"
+	reservation "github.com/openchami/smd/v2/pkg/service-reservations"
+	"github.com/openchami/smd/v2/pkg/sm"
 	"github.com/sirupsen/logrus"
 )
 

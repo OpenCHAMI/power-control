@@ -1,6 +1,6 @@
 module github.com/openchami/power-control/v2
 
-go 1.26.0
+go 1.26.5
 
 //todo hms-base needs to be converted to hms-xname as soon as that package is available.
 
@@ -13,7 +13,6 @@ require (
 	github.com/Cray-HPE/hms-trs-app-api/v3 v3.0.6
 	github.com/Cray-HPE/hms-xname v1.4.0
 	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20240321222802-e6cb468a2a18
-	github.com/OpenCHAMI/smd/v2 v2.20.5
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/go-cmp v0.7.0
@@ -23,6 +22,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/openchami/chi-middleware/auth v0.0.0-20240812224658-b16b83c70700
 	github.com/openchami/chi-middleware/log v0.0.0-20240812224658-b16b83c70700
+	github.com/openchami/smd/v2 v2.20.5
 	github.com/rs/zerolog v1.35.1
 	github.com/sirupsen/logrus v1.10.1
 	github.com/spf13/cobra v1.10.2
@@ -76,7 +76,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/go-secure-stdlib/parseutil v0.2.0 // indirect
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect

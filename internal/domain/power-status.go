@@ -35,7 +35,7 @@ import (
 	base "github.com/Cray-HPE/hms-base/v2"
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/Cray-HPE/hms-xname/xnametypes"
-	rf "github.com/OpenCHAMI/smd/v2/pkg/redfish"
+	rf "github.com/openchami/smd/v2/pkg/redfish"
 
 	"github.com/openchami/power-control/v2/internal/credstore"
 	pcshsm "github.com/openchami/power-control/v2/internal/hsm"
