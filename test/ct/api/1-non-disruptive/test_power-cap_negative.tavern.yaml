@@ -947,6 +947,7 @@ stages:
                 required: True
                 enum:
                   - "json: cannot unmarshal string into Go struct field PowerCapControlParameter.components.controls.value of type int"
+                  - "json: cannot unmarshal string into Go struct field PowerCapPatchParameter.components.0.controls.0.value of type int"
               status:
                 type: int
                 required: True
