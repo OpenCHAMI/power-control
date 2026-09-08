@@ -49,6 +49,9 @@ ENV API_URL="http://cray-power"
 ENV API_SERVER_PORT=":28007"
 ENV API_BASE_PATH="/v1"
 
+ENV PCS_JAWS_MONITOR="true"
+ENV PCS_JAWS_MONITOR_INTERVAL="20"
+
 COPY power-control /usr/local/bin/
 COPY configs configs
 COPY migrations migrations
