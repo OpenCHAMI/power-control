@@ -23,6 +23,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -130,5 +131,10 @@ func (d *ETCDLockProvider) Close() error {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	return d.kvHandle.Close()
+	// Closing the client alone leaves the lock held until its lease expires.
+	unlockErr := d.kvHandle.DistUnlock()
+	d.Duration = 0
+	closeErr := d.kvHandle.Close()
+	
+	return errors.Join(unlockErr, closeErr)
 }
