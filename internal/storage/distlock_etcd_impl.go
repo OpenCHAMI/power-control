@@ -135,6 +135,6 @@ func (d *ETCDLockProvider) Close() error {
 	unlockErr := d.kvHandle.DistUnlock()
 	d.Duration = 0
 	closeErr := d.kvHandle.Close()
-	
+
 	return errors.Join(unlockErr, closeErr)
 }
