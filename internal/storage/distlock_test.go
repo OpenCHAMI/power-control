@@ -38,6 +38,9 @@ func (s *StorageTestSuite) TestDistributedLock() {
 }
 
 func (s *StorageTestSuite) TestDistrubutedLockAlreadyAcquired() {
+	if _, memory := s.dlp.(*MEMLockProvider); memory {
+		s.T().Skip("Memory locks are no-ops and do not enforce exclusion")
+	}
 	t := s.T()
 	err := s.dlp.DistributedTimedLock(5 * time.Second)
 	require.NoError(t, err, "DistributedTimedLock() failed")
@@ -48,6 +51,9 @@ func (s *StorageTestSuite) TestDistrubutedLockAlreadyAcquired() {
 }
 
 func (s *StorageTestSuite) TestDistributedLockTimeout() {
+	if _, memory := s.dlp.(*MEMLockProvider); memory {
+		s.T().Skip("Memory locks are no-ops and cannot time out on contention")
+	}
 	t := s.T()
 	err := s.dlp.DistributedTimedLock(4 * time.Second)
 	require.NoError(t, err, "DistributedTimedLock() failed")
@@ -102,6 +108,9 @@ func (s *StorageTestSuite) TestDistributedLockUnlock() {
 // TestDistributedLockClose tests that the Close method of the DistributedLockProvider will release
 // the lock if it is held.
 func (s *StorageTestSuite) TestDistributedLockClose() {
+	if _, memory := s.dlp.(*MEMLockProvider); memory {
+		s.T().Skip("Closing a Memory lock provider is a no-op")
+	}
 	t := s.T()
 	// Create a new distributed lock provider as Close will render
 	// fixture s.dlp unusable.
@@ -193,6 +202,9 @@ func acquireLock(dlp DistributedLockProvider, lockAttemptResult chan error, wait
 }
 
 func (s *StorageTestSuite) TestDistributedLockGoRoutineRace() {
+	if _, memory := s.dlp.(*MEMLockProvider); memory {
+		s.T().Skip("Memory locks are no-ops and do not enforce exclusion")
+	}
 	t := s.T()
 	numGoroutines := 50
 	// Channels to communicate results from goroutines
