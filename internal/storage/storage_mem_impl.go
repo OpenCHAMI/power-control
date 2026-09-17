@@ -212,6 +212,11 @@ func (m *MEMStorage) DeleteTransitionTask(transitionID uuid.UUID, taskID uuid.UU
 
 func (m *MEMStorage) TASTransition(transition model.Transition, testVal model.Transition) (bool, error) {
 	e := toETCDStorage(m)
+	key := e.fixUpKey(fmt.Sprintf("%s/%s", keySegTransition, transition.TransitionID))
+	// Memory's TAS creates missing keys, so require an existing transition first.
+	if _, exists, err := m.kvHandle.Get(key); err != nil || !exists {
+		return false, err
+	}
 	return e.TASTransition(transition, testVal)
 }
 
