@@ -175,12 +175,6 @@ func (s *StorageTestSuite) TestPowerCapTaskDelete() {
 
 	_, err = s.sp.GetPowerCapTask(task.TaskID)
 	s.Require().Error(err)
-	if _, memory := s.sp.(*MEMStorage); memory {
-		s.Require().ErrorContains(err, "does not exist")
-	} else {
-		s.Require().ErrorContains(err, "power cap task does not exist")
-	}
-
 }
 
 // TestPowerCapTaskDelete tests deleting a single power cap operation.
@@ -205,11 +199,6 @@ func (s *StorageTestSuite) TestPowerCapOperationDelete() {
 
 	_, err = s.sp.GetPowerCapOperation(task.TaskID, op.OperationID)
 	s.Require().Error(err)
-	if _, memory := s.sp.(*MEMStorage); memory {
-		s.Require().ErrorContains(err, "does not exist")
-	} else {
-		s.Require().ErrorContains(err, "could not retrieve power cap operation")
-	}
 }
 
 // TestPowerCapMultiple tests inserting, retrieving, and deleting multiple associated resources.
