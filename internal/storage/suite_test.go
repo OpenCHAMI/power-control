@@ -53,6 +53,14 @@ func (s *StorageTestSuite) SetupSuite() {
 	s.containers = map[string]testcontainers.Container{}
 	s.containers[name] = ctr
 	s.storageContainer = ctr
+	if name == ETCD_CONTAINER {
+		host, err := ctr.Host(context.Background())
+		s.Require().NoError(err)
+		port, err := ctr.MappedPort(context.Background(), "2379/tcp")
+		s.Require().NoError(err)
+		s.T().Setenv("ETCD_HOST", host)
+		s.T().Setenv("ETCD_PORT", port.Port())
+	}
 
 	storage := os.Getenv(STORAGE_ENV)
 	if storage != STORAGE_POSTGRES && storage != STORAGE_ETCD && storage != STORAGE_MEMORY {
