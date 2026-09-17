@@ -636,6 +636,9 @@ func (p *PostgresStorage) TASTransition(transition model.Transition, testVal mod
 	defer tx.Rollback()
 	var current model.Transition
 	err = tx.Get(&current, "SELECT * FROM transitions WHERE id = $1", transition.TransitionID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
 	if err != nil {
 		return false, fmt.Errorf("could retrieve TAS transition: %w", err)
 	}

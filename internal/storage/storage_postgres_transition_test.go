@@ -259,7 +259,7 @@ func (s *StorageTestSuite) TestTransitionTAS() {
 	modTransition.TransitionID = uuid.New()
 	t.Logf("attempting TAS on non-existent transition %s", modTransition.TransitionID)
 	changed, err = s.sp.TASTransition(modTransition, gotTransition)
-	s.Require().ErrorContains(err, "could retrieve TAS transition")
+	s.Require().NoError(err)
 	s.Require().False(changed)
 }
 
