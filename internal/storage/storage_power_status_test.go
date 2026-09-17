@@ -73,10 +73,6 @@ func (s *StorageTestSuite) TestStorePowerStatus() {
 		SupportedPowerTransitions: []string{"On", "Off"},
 		Error:                     "OK",
 	}
-	if _, memory := s.sp.(*MEMStorage); memory {
-		// Memory's JSON reader requires a populated timestamp.
-		ps.LastUpdated = time.Now().Truncate(time.Microsecond)
-	}
 
 	err := s.sp.StorePowerStatus(ps)
 	require.NoError(t, err)
