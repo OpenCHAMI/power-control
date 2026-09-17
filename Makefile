@@ -37,7 +37,7 @@ unittest:
 
 # Integration tests that spawn their own containers from Go.
 integration:
-	PCS_TEST_STORAGE=${STORAGE} go test --tags=integration_tests ./...
+	STORAGE=${STORAGE} go test --tags=integration_tests ./...
 
 snyk:
 	./runSnyk.sh
@@ -50,4 +50,3 @@ ct_image:
 
 image-pprof:
 	docker build --pull ${DOCKER_ARGS} --tag '${NAME}-pprof:${VERSION}' -f Dockerfile.pprof .
-

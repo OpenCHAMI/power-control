@@ -23,5 +23,5 @@ jobs:
           go-version: '>=1.24.0'
       - name: Run integration tests
         env:
-          PCS_TEST_STORAGE: ${{ matrix.storage }}
+          STORAGE: ${{ matrix.storage }}
         run: make integration
