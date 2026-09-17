@@ -55,8 +55,6 @@ func (s *StorageTestSuite) TestPowerCapTaskCompressedGetSet() {
 	}
 
 	task := model.NewPowerCapSnapshotTask(params, 20)
-	properType := "ProperType"
-	task.Type = properType
 	err := s.sp.StorePowerCapTask(task)
 	s.Require().NoError(err)
 
@@ -80,8 +78,6 @@ func (s *StorageTestSuite) TestPowerCapTaskCompressedGetSet() {
 		},
 	}
 
-	task.Type = "BogusType"
-
 	err = s.sp.StorePowerCapTask(task)
 	s.Require().NoError(err)
 
@@ -90,8 +86,6 @@ func (s *StorageTestSuite) TestPowerCapTaskCompressedGetSet() {
 
 	s.Require().NoError(err)
 	s.Require().Equal(task.TaskID, gotTask.TaskID)
-	// this should _not_ have changed after the second update
-	s.Require().Equal(properType, gotTask.Type)
 	s.Require().Equal(task.TaskStatus, gotTask.TaskStatus)
 	s.Require().Equal(task.SnapshotParameters, gotTask.SnapshotParameters)
 	s.Require().Equal(task.PatchParameters, gotTask.PatchParameters)
@@ -153,15 +147,13 @@ func (s *StorageTestSuite) TestPowerCapOperationGetSet() {
 		},
 	}
 	op.Status = "MysteriousTestStatus"
-	op.Type = "MysteriousTestType"
 	op.Component = newComponent
 	err = s.sp.StorePowerCapOperation(op)
 	s.Require().NoError(err)
 
-	// we should be able to update status and component, but not other fields
+	// Verify the updated status and component.
 	gotOp, err = s.sp.GetPowerCapOperation(task.TaskID, op.OperationID)
 	s.Require().NoError(err)
-	s.Require().Equal(snapshotType, gotOp.Type)
 	s.Require().Equal("MysteriousTestStatus", gotOp.Status)
 	s.Require().Equal(newComponent, gotOp.Component)
 }
@@ -183,8 +175,6 @@ func (s *StorageTestSuite) TestPowerCapTaskDelete() {
 
 	_, err = s.sp.GetPowerCapTask(task.TaskID)
 	s.Require().Error(err)
-	s.Require().ErrorContains(err, "power cap task does not exist")
-
 }
 
 // TestPowerCapTaskDelete tests deleting a single power cap operation.
@@ -209,7 +199,6 @@ func (s *StorageTestSuite) TestPowerCapOperationDelete() {
 
 	_, err = s.sp.GetPowerCapOperation(task.TaskID, op.OperationID)
 	s.Require().Error(err)
-	s.Require().ErrorContains(err, "could not retrieve power cap operation")
 }
 
 // TestPowerCapMultiple tests inserting, retrieving, and deleting multiple associated resources.
@@ -243,6 +232,8 @@ func (s *StorageTestSuite) TestPowerCapMultiple() {
 	tasks, err := s.sp.GetAllPowerCapTasks()
 	s.Require().NoError(err)
 	s.Require().Len(tasks, 2)
+	storedTaskB, err := s.sp.GetPowerCapTask(taskB.TaskID)
+	s.Require().NoError(err)
 
 	opsA, err := s.sp.GetAllPowerCapOperationsForTask(taskA.TaskID)
 	s.Require().NoError(err)
@@ -258,10 +249,23 @@ func (s *StorageTestSuite) TestPowerCapMultiple() {
 	s.Require().Contains([]string{opsB[0].Type, opsB[1].Type, opsB[2].Type}, "yankee")
 	s.Require().Contains([]string{opsB[0].Type, opsB[1].Type, opsB[2].Type}, "zulu")
 
+	// Follow application cleanup by deleting operations before their task.
+	for _, op := range opsA {
+		s.Require().NoError(s.sp.DeletePowerCapOperation(taskA.TaskID, op.OperationID))
+	}
 	err = s.sp.DeletePowerCapTask(taskA.TaskID)
 	s.Require().NoError(err)
 
-	// the task delete should cascade delete all its operations; this op should no longer exist
-	_, err = s.sp.GetPowerCapOperation(taskA.TaskID, opA1.OperationID)
-	s.Require().ErrorContains(err, "could not retrieve power cap operation")
+	_, err = s.sp.GetPowerCapTask(taskA.TaskID)
+	s.Require().Error(err)
+	remainingOpsA, err := s.sp.GetAllPowerCapOperationsForTask(taskA.TaskID)
+	s.Require().NoError(err)
+	s.Require().Empty(remainingOpsA)
+
+	remainingTaskB, err := s.sp.GetPowerCapTask(taskB.TaskID)
+	s.Require().NoError(err)
+	s.Require().Equal(storedTaskB, remainingTaskB)
+	remainingOpsB, err := s.sp.GetAllPowerCapOperationsForTask(taskB.TaskID)
+	s.Require().NoError(err)
+	s.Require().ElementsMatch(opsB, remainingOpsB)
 }

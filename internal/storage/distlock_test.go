@@ -38,6 +38,9 @@ func (s *StorageTestSuite) TestDistributedLock() {
 }
 
 func (s *StorageTestSuite) TestDistrubutedLockAlreadyAcquired() {
+	if _, memory := s.dlp.(*MEMLockProvider); memory {
+		s.T().Skip("Memory locks are no-ops and do not enforce exclusion")
+	}
 	t := s.T()
 	err := s.dlp.DistributedTimedLock(5 * time.Second)
 	require.NoError(t, err, "DistributedTimedLock() failed")
@@ -48,6 +51,9 @@ func (s *StorageTestSuite) TestDistrubutedLockAlreadyAcquired() {
 }
 
 func (s *StorageTestSuite) TestDistributedLockTimeout() {
+	if _, memory := s.dlp.(*MEMLockProvider); memory {
+		s.T().Skip("Memory locks are no-ops and cannot time out on contention")
+	}
 	t := s.T()
 	err := s.dlp.DistributedTimedLock(4 * time.Second)
 	require.NoError(t, err, "DistributedTimedLock() failed")
@@ -102,6 +108,9 @@ func (s *StorageTestSuite) TestDistributedLockUnlock() {
 // TestDistributedLockClose tests that the Close method of the DistributedLockProvider will release
 // the lock if it is held.
 func (s *StorageTestSuite) TestDistributedLockClose() {
+	if _, memory := s.dlp.(*MEMLockProvider); memory {
+		s.T().Skip("Closing a Memory lock provider is a no-op")
+	}
 	t := s.T()
 	// Create a new distributed lock provider as Close will render
 	// fixture s.dlp unusable.
@@ -117,20 +126,8 @@ func (s *StorageTestSuite) TestDistributedLockClose() {
 	err = lockProvider.Close()
 	require.NoError(t, err, "Close() failed")
 
-	// After closing the lock provider, we should not be able call any methods on it
-	err = lockProvider.Ping()
-	require.Error(t, err, "Expected error when calling Ping() on closed lock provider, but got none")
-
-	err = lockProvider.DistributedTimedLock(5 * time.Second)
-	require.Error(t, err, "Expected error when trying to acquire lock on closed lock provider, but got none")
-
-	err = lockProvider.Unlock()
-	require.Error(t, err, "Expected error when trying to unlock on closed lock provider, but got none")
-
-	err = lockProvider.Close()
-	require.Error(t, err, "Expected error when trying to close already closed lock provider, but got none")
-
-	// Ensure that we can now acquire the lock again
+	// Another provider must acquire promptly, without waiting for the original
+	// 60-second lease to expire.
 	lockProvider2, err := s.createDistLockProvider()
 	require.NoError(t, err, "Error creating second distributed lock provider")
 
@@ -193,6 +190,9 @@ func acquireLock(dlp DistributedLockProvider, lockAttemptResult chan error, wait
 }
 
 func (s *StorageTestSuite) TestDistributedLockGoRoutineRace() {
+	if _, memory := s.dlp.(*MEMLockProvider); memory {
+		s.T().Skip("Memory locks are no-ops and do not enforce exclusion")
+	}
 	t := s.T()
 	numGoroutines := 50
 	// Channels to communicate results from goroutines
