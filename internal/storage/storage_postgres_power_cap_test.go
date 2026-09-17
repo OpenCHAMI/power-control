@@ -243,6 +243,8 @@ func (s *StorageTestSuite) TestPowerCapMultiple() {
 	tasks, err := s.sp.GetAllPowerCapTasks()
 	s.Require().NoError(err)
 	s.Require().Len(tasks, 2)
+	storedTaskB, err := s.sp.GetPowerCapTask(taskB.TaskID)
+	s.Require().NoError(err)
 
 	opsA, err := s.sp.GetAllPowerCapOperationsForTask(taskA.TaskID)
 	s.Require().NoError(err)
@@ -258,24 +260,23 @@ func (s *StorageTestSuite) TestPowerCapMultiple() {
 	s.Require().Contains([]string{opsB[0].Type, opsB[1].Type, opsB[2].Type}, "yankee")
 	s.Require().Contains([]string{opsB[0].Type, opsB[1].Type, opsB[2].Type}, "zulu")
 
+	// Follow application cleanup by deleting operations before their task.
+	for _, op := range opsA {
+		s.Require().NoError(s.sp.DeletePowerCapOperation(taskA.TaskID, op.OperationID))
+	}
 	err = s.sp.DeletePowerCapTask(taskA.TaskID)
 	s.Require().NoError(err)
 
-	if _, memory := s.sp.(*MEMStorage); memory {
-		// Memory has no cascading delete; the caller deletes operations explicitly.
-		ops, err := s.sp.GetAllPowerCapOperationsForTask(taskA.TaskID)
-		s.Require().NoError(err)
-		s.Require().Len(ops, 2)
-		for _, op := range ops {
-			s.Require().NoError(s.sp.DeletePowerCapOperation(taskA.TaskID, op.OperationID))
-		}
-		ops, err = s.sp.GetAllPowerCapOperationsForTask(taskA.TaskID)
-		s.Require().NoError(err)
-		s.Require().Empty(ops)
-		return
-	}
+	_, err = s.sp.GetPowerCapTask(taskA.TaskID)
+	s.Require().Error(err)
+	remainingOpsA, err := s.sp.GetAllPowerCapOperationsForTask(taskA.TaskID)
+	s.Require().NoError(err)
+	s.Require().Empty(remainingOpsA)
 
-	// the task delete should cascade delete all its operations; this op should no longer exist
-	_, err = s.sp.GetPowerCapOperation(taskA.TaskID, opA1.OperationID)
-	s.Require().ErrorContains(err, "could not retrieve power cap operation")
+	remainingTaskB, err := s.sp.GetPowerCapTask(taskB.TaskID)
+	s.Require().NoError(err)
+	s.Require().Equal(storedTaskB, remainingTaskB)
+	remainingOpsB, err := s.sp.GetAllPowerCapOperationsForTask(taskB.TaskID)
+	s.Require().NoError(err)
+	s.Require().ElementsMatch(opsB, remainingOpsB)
 }
