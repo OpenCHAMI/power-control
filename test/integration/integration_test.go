@@ -87,6 +87,7 @@ type IntegrationTestSuite struct {
 	pcsImage    string
 	keycloakURL string
 	smdURL      string
+	tokensmith  testcontainers.Container
 }
 
 func TestIntegrationSuite(t *testing.T) {
@@ -169,6 +170,7 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	s.startSMD("smd-open", false)
 
 	s.addSMDComponent("x0c0s0b0n0")
+	s.startTokenSmith()
 }
 
 func smdEnv() map[string]string {

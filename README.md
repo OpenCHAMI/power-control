@@ -9,6 +9,7 @@ This is a fork of the original PCS code from [Cray-HPE/hms-power-control](https:
 - Direct push-based state syncing without Kafka.
 - Public multi-architecture container builds.
 - Optional JWT/JWKS API authentication.
+- Optional [TokenSmith authentication and authorization](docs/tokensmith.md).
 - OAuth2 access tokens for SMD calls.
 - Fake Vault credential store support for local and test deployments.
 
