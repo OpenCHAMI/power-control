@@ -129,7 +129,6 @@ services:
       - SMD_DBPASS=${POSTGRES_PASSWORD:-postgres}
       - SMD_DBOPTS=sslmode=disable
       - SMD_JWKS_URL=
-      - RF_MSG_HOST=kafka:9092:cray-dmtf-resource-event
       - CRAY_VAULT_AUTH_PATH=auth/token/create
       - CRAY_VAULT_ROLE_FILE=configs/namespace
       - CRAY_VAULT_JWT_FILE=configs/token
@@ -158,28 +157,6 @@ services:
       start_period: 5s
     ports:
       - "27779:27779"
-    networks:
-      - pcs
-  zookeeper:
-    image: docker.io/confluentinc/cp-zookeeper:7.9.9
-    hostname: zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    networks:
-      - pcs
-  kafka:
-    image: docker.io/confluentinc/cp-kafka:8.3.1
-    hostname: kafka
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     networks:
       - pcs
   #
