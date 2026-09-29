@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a fake Vault drop-in credential store to set credentials from the environment.
 - Added support for using an OAuth2 client to access SMD.
 - Added optional Tokensmith authentication and authorization.
+- Added Tokensmith service tokens for outbound SMD requests.
 
 ### Changes
 
