@@ -130,8 +130,7 @@ type PowerStatusComponent struct {
 	LastUpdated               time.Time `json:"lastUpdated" db:"last_updated"`
 }
 
-// UnmarshalJSON is a custom marshaller for PowerStatusComponent to ensure
-// that that LastUpdated is "" if its not been set.
+// MarshalJSON ensures that LastUpdated is "" if it has not been set.
 func (p PowerStatusComponent) MarshalJSON() ([]byte, error) {
 	type PowerStatusComponentOrginal PowerStatusComponent
 
@@ -151,6 +150,37 @@ func (p PowerStatusComponent) MarshalJSON() ([]byte, error) {
 		PowerStatusComponentOrginal: (*PowerStatusComponentOrginal)(&p),
 		LastUpdated:                 lastUpdated,
 	})
+}
+
+// UnmarshalJSON restores an empty LastUpdated string to the zero time.
+func (p *PowerStatusComponent) UnmarshalJSON(data []byte) error {
+	type powerStatusComponent PowerStatusComponent
+	decoded := struct {
+		*powerStatusComponent
+		LastUpdated *string `json:"lastUpdated"`
+	}{powerStatusComponent: (*powerStatusComponent)(p)}
+
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+
+	if decoded.LastUpdated == nil {
+		return nil
+	}
+
+	if *decoded.LastUpdated == "" {
+		p.LastUpdated = time.Time{}
+		return nil
+	}
+
+	lastUpdated, err := time.Parse(time.RFC3339Nano, *decoded.LastUpdated)
+	if err != nil {
+		return err
+	}
+
+	p.LastUpdated = lastUpdated
+
+	return nil
 }
 
 type PowerStatus struct {
