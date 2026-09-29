@@ -117,14 +117,15 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 	rootCommand.Flags().IntVar(&etcd.maxObjectSize, "etcd-max-object-size", storage.DefaultMaxEtcdObjectSize, "The maximum data size in bytes for objects in etcd.")
 
 	// JWKS URL flag
-	rootCommand.Flags().StringVar(&pcs.jwksURL, "jwks-url", "", "Set the JWKS URL to fetch public key for validation")
+	rootCommand.Flags().StringVar(&pcs.jwksURL, "jwks-url", "", "JWKS endpoint for the jwks inbound provider")
 	rootCommand.Flags().StringVar(&pcs.authProvider, "auth-provider", authProviderJWKS, "Inbound authentication provider: jwks or tokensmith")
-	rootCommand.Flags().StringVar(&pcs.tokensmith.Issuer, "auth-issuer", "", "Expected TokenSmith token issuer")
-	rootCommand.Flags().StringVar(&pcs.tokensmith.Audience, "auth-audience", "power-control", "Expected TokenSmith token audience")
-	rootCommand.Flags().StringVar(&pcs.tokensmith.Mode, "authz-mode", "enforce", "TokenSmith authorization mode: enforce, shadow, or off (authentication remains required)")
-	rootCommand.Flags().StringVar(&pcs.tokensmith.ModelPath, "authz-model-path", "", "Casbin model file; defaults to TokenSmith's RBAC path model")
-	rootCommand.Flags().StringVar(&pcs.tokensmith.PolicyPath, "authz-policy-path", "", "Casbin policy file or directory (required in enforce and shadow modes)")
-	rootCommand.Flags().StringVar(&pcs.tokensmith.GroupingPath, "authz-grouping-path", "", "Optional Casbin role grouping file or directory")
+	rootCommand.Flags().StringVar(&pcs.tokensmith.JWKSURL, "tokensmith-jwks-url", "", "JWKS endpoint for inbound TokenSmith token validation")
+	rootCommand.Flags().StringVar(&pcs.tokensmith.Issuer, "tokensmith-issuer", "", "Expected TokenSmith token issuer")
+	rootCommand.Flags().StringVar(&pcs.tokensmith.Audience, "tokensmith-audience", "power-control", "Expected TokenSmith token audience")
+	rootCommand.Flags().StringVar(&pcs.tokensmith.Mode, "tokensmith-authz-mode", "enforce", "TokenSmith authorization mode: enforce, shadow, or off (authentication remains required)")
+	rootCommand.Flags().StringVar(&pcs.tokensmith.ModelPath, "tokensmith-authz-model-path", "", "Casbin model file; defaults to TokenSmith's RBAC path model")
+	rootCommand.Flags().StringVar(&pcs.tokensmith.PolicyPath, "tokensmith-authz-policy-path", "", "Casbin policy file or directory (required in enforce and shadow modes)")
+	rootCommand.Flags().StringVar(&pcs.tokensmith.GroupingPath, "tokensmith-authz-grouping-path", "", "Optional Casbin role grouping file or directory")
 
 	// OAuth2 flags
 	rootCommand.Flags().StringVar(&oauth2.clientID, "oauth2-client-id", "", "OAuth2 client ID")

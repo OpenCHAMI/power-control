@@ -1,7 +1,7 @@
 // Copyright © 2026 OpenCHAMI a Series of LF Projects, LLC
 // SPDX-License-Identifier: MIT
 
-package api
+package auth
 
 import (
 	"context"
@@ -23,8 +23,8 @@ import (
 	"github.com/openchami/power-control/v2/internal/logger"
 )
 
-// TokenSmithConfig configures inbound authentication and authorization only.
-type TokenSmithConfig struct {
+// TokensmithConfig configures inbound authentication and authorization only.
+type TokensmithConfig struct {
 	JWKSURL      string
 	Issuer       string
 	Audience     string
@@ -39,18 +39,18 @@ type tokenSmithAuth struct {
 	authorize    *authz.Middleware
 }
 
-func NewTokenSmithAuth(ctx context.Context, config TokenSmithConfig) (Auth, error) {
+func NewTokenSmithAuth(ctx context.Context, config TokensmithConfig) (Auth, error) {
 	mode := authz.Mode(config.Mode)
 	switch mode {
 	case authz.ModeOff, authz.ModeShadow, authz.ModeEnforce:
 	default:
-		return nil, fmt.Errorf("invalid authz-mode %q: use off, shadow, or enforce", config.Mode)
+		return nil, fmt.Errorf("invalid tokensmith-authz-mode %q: use off, shadow, or enforce", config.Mode)
 	}
 	if config.Issuer == "" || config.Audience == "" || config.JWKSURL == "" {
-		return nil, fmt.Errorf("TokenSmith requires auth-issuer, auth-audience, and jwks-url")
+		return nil, fmt.Errorf("TokenSmith requires tokensmith-issuer, tokensmith-audience, and tokensmith-jwks-url")
 	}
 	if mode != authz.ModeOff && config.PolicyPath == "" {
-		return nil, fmt.Errorf("TokenSmith requires authz-policy-path in %s mode", mode)
+		return nil, fmt.Errorf("TokenSmith requires tokensmith-authz-policy-path in %s mode", mode)
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}

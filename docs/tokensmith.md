@@ -10,12 +10,12 @@ Use these container environment variables, or export them before starting PCS:
 
 ```sh
 AUTH_PROVIDER=tokensmith
-AUTH_ISSUER=https://tokensmith.example
-JWKS_URL=https://tokensmith.example/.well-known/jwks.json
-AUTH_AUDIENCE=power-control
-AUTHZ_MODE=enforce
-AUTHZ_POLICY_PATH=/configs/authz/policy.csv
-AUTHZ_GROUPING_PATH=/configs/authz/grouping.csv
+TOKENSMITH_ISSUER=https://tokensmith.example
+TOKENSMITH_JWKS_URL=https://tokensmith.example/.well-known/jwks.json
+TOKENSMITH_AUDIENCE=power-control
+TOKENSMITH_AUTHZ_MODE=enforce
+TOKENSMITH_AUTHZ_POLICY_PATH=/configs/authz/policy.csv
+TOKENSMITH_AUTHZ_GROUPING_PATH=/configs/authz/grouping.csv
 ```
 
 The bundled policy grants `power-reader` read access and `power-operator` read,
@@ -26,16 +26,17 @@ exchange through TokenSmith first.
 | Flag | Environment variable | Default |
 | --- | --- | --- |
 | `--auth-provider` | `AUTH_PROVIDER` | `jwks` |
-| `--jwks-url` | `JWKS_URL` | empty |
-| `--auth-issuer` | `AUTH_ISSUER` | empty (required for TokenSmith) |
-| `--auth-audience` | `AUTH_AUDIENCE` | `power-control` |
-| `--authz-mode` | `AUTHZ_MODE` | `enforce` |
-| `--authz-model-path` | `AUTHZ_MODEL_PATH` | TokenSmith's RBAC path model |
-| `--authz-policy-path` | `AUTHZ_POLICY_PATH` | empty (required for enforce/shadow) |
-| `--authz-grouping-path` | `AUTHZ_GROUPING_PATH` | empty |
+| `--tokensmith-jwks-url` | `TOKENSMITH_JWKS_URL` | empty (required) |
+| `--tokensmith-issuer` | `TOKENSMITH_ISSUER` | empty (required for TokenSmith) |
+| `--tokensmith-audience` | `TOKENSMITH_AUDIENCE` | `power-control` |
+| `--tokensmith-authz-mode` | `TOKENSMITH_AUTHZ_MODE` | `enforce` |
+| `--tokensmith-authz-model-path` | `TOKENSMITH_AUTHZ_MODEL_PATH` | TokenSmith's RBAC path model |
+| `--tokensmith-authz-policy-path` | `TOKENSMITH_AUTHZ_POLICY_PATH` | empty (required for enforce/shadow) |
+| `--tokensmith-authz-grouping-path` | `TOKENSMITH_AUTHZ_GROUPING_PATH` | empty |
 
-Flags override their environment variables. `PCS_JWKS_URL` takes precedence
-over both `JWKS_URL` and `--jwks-url`.
+Flags override their environment variables. The `jwks` provider keeps its
+existing `JWKS_URL` / `--jwks-url` setting, with `PCS_JWKS_URL` taking precedence
+over both. These settings do not affect the `tokensmith` provider.
 
 All TokenSmith modes require authentication:
 

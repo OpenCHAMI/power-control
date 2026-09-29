@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openchami/power-control/v2/internal/auth"
 	"github.com/openchami/power-control/v2/internal/logger"
 
 	"github.com/go-chi/chi/v5"
@@ -78,7 +79,7 @@ func Logger(inner http.Handler, name string) http.Handler {
 }
 
 // NewRouter registers public and protected routes with request logging.
-func NewRouter(auth Auth) *chi.Mux {
+func NewRouter(authentication auth.Auth) *chi.Mux {
 	router := chi.NewRouter()
 	// Setup logger
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
@@ -88,7 +89,7 @@ func NewRouter(auth Auth) *chi.Mux {
 	router.Use(middleware.RequestID)
 	router.Use(openchami_logger.OpenCHAMILogger(logger))
 
-	protected := router.With(auth.Wrap)
+	protected := router.With(authentication.Wrap)
 	registerRoutes(router, protected)
 	RegisterPProfHandlers(router)
 
