@@ -38,12 +38,12 @@ func (s *IntegrationTestSuite) startTokenSmith() {
 
 func tokenSmithEnv() map[string]string {
 	return map[string]string{
-		"AUTH_PROVIDER":       "tokensmith",
-		"AUTH_ISSUER":         tokenSmithIssuer,
-		"AUTH_AUDIENCE":       "power-control",
-		"PCS_JWKS_URL":        tokenSmithIssuer + "/.well-known/jwks.json",
-		"AUTHZ_POLICY_PATH":   "/configs/authz/policy.csv",
-		"AUTHZ_GROUPING_PATH": "/configs/authz/grouping.csv",
+		"AUTH_PROVIDER":                  "tokensmith",
+		"TOKENSMITH_ISSUER":              tokenSmithIssuer,
+		"TOKENSMITH_AUDIENCE":            "power-control",
+		"TOKENSMITH_JWKS_URL":            tokenSmithIssuer + "/.well-known/jwks.json",
+		"TOKENSMITH_AUTHZ_POLICY_PATH":   "/configs/authz/policy.csv",
+		"TOKENSMITH_AUTHZ_GROUPING_PATH": "/configs/authz/grouping.csv",
 	}
 }
 
@@ -98,8 +98,8 @@ func (s *IntegrationTestSuite) TestTokenSmithAuthorization() {
 func (s *IntegrationTestSuite) TestTokenSmithIssuerAndAudience() {
 	token := s.mintTokenSmithToken("power-reader")
 	mismatchedClaims := map[string]string{
-		"AUTH_ISSUER":   "https://another-issuer.example",
-		"AUTH_AUDIENCE": "another-service",
+		"TOKENSMITH_ISSUER":   "https://another-issuer.example",
+		"TOKENSMITH_AUDIENCE": "another-service",
 	}
 	for name, value := range mismatchedClaims {
 		s.Run(name, func() {
@@ -133,7 +133,7 @@ func (s *IntegrationTestSuite) TestTokenSmithAuthorizationModes() {
 		s.Run(mode, func() {
 			t := s.T()
 			env := tokenSmithEnv()
-			env["AUTHZ_MODE"] = mode
+			env["TOKENSMITH_AUTHZ_MODE"] = mode
 			pcs := s.startPCS(env)
 			status, _ := httpRequest(t, http.MethodGet, pcs+"/transitions", "", nil)
 			require.Equal(t, http.StatusUnauthorized, status)
@@ -147,10 +147,10 @@ func (s *IntegrationTestSuite) TestTokenSmithInvalidConfiguration() {
 		name, value, errorText string
 	}{
 		{"AUTH_PROVIDER", "invalid", "invalid auth-provider"},
-		{"AUTH_ISSUER", "", "TokenSmith requires auth-issuer"},
-		{"AUTHZ_MODE", "invalid", "invalid authz-mode"},
-		{"AUTHZ_POLICY_PATH", "/missing-policy.csv", "configure TokenSmith authorization"},
-		{"PCS_JWKS_URL", tokenSmithIssuer + "/missing-jwks", "initialize TokenSmith JWKS"},
+		{"TOKENSMITH_ISSUER", "", "TokenSmith requires tokensmith-issuer"},
+		{"TOKENSMITH_AUTHZ_MODE", "invalid", "invalid tokensmith-authz-mode"},
+		{"TOKENSMITH_AUTHZ_POLICY_PATH", "/missing-policy.csv", "configure TokenSmith authorization"},
+		{"TOKENSMITH_JWKS_URL", tokenSmithIssuer + "/missing-jwks", "initialize TokenSmith JWKS"},
 	}
 	for _, tc := range invalidConfig {
 		s.Run(tc.name, func() {

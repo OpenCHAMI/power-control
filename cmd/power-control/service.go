@@ -19,6 +19,7 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/openchami/power-control/v2/internal/api"
+	"github.com/openchami/power-control/v2/internal/auth"
 	"github.com/openchami/power-control/v2/internal/credstore"
 	"github.com/openchami/power-control/v2/internal/domain"
 	"github.com/openchami/power-control/v2/internal/hsm"
@@ -79,7 +80,7 @@ const (
 type pcsConfig struct {
 	authProvider       string
 	jwksURL            string
-	tokensmith         api.TokenSmithConfig
+	tokensmith         auth.TokensmithConfig
 	fakeVaultEnabled   bool
 	vaultEnabled       bool
 	vaultKeypath       string
@@ -115,27 +116,24 @@ type oauth2Config struct {
 
 // runPCS runs the Power Control Service (PCS).
 func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2Config *oauth2Config) error {
-	jwksURL := pcs.jwksURL
-	if url := os.Getenv("PCS_JWKS_URL"); url != "" {
-		jwksURL = url
-	}
-
-	var auth api.Auth
+	var authentication auth.Auth
 	var err error
 	switch pcs.authProvider {
 	case authProviderJWKS:
-		auth, err = api.NewJWKSAuth(ctx, api.JWKSConfig{JWKSURL: jwksURL})
+		jwksURL := pcs.jwksURL
+		if url := os.Getenv("PCS_JWKS_URL"); url != "" {
+			jwksURL = url
+		}
+		authentication, err = auth.NewJWKSAuth(ctx, auth.JWKSConfig{JWKSURL: jwksURL})
 	case authProviderTokenSmith:
-		config := pcs.tokensmith
-		config.JWKSURL = jwksURL
-		auth, err = api.NewTokenSmithAuth(ctx, config)
+		authentication, err = auth.NewTokenSmithAuth(ctx, pcs.tokensmith)
 	default:
 		return fmt.Errorf("invalid auth-provider %q: use jwks or tokensmith", pcs.authProvider)
 	}
 	if err != nil {
 		return err
 	}
-	router := api.NewRouter(auth)
+	router := api.NewRouter(authentication)
 
 	serviceName, err := base.GetServiceInstanceName()
 	if err != nil {
