@@ -61,3 +61,52 @@ Restart PCS to reload policy changes. Authorization decisions are logged in
 level and denials use info, including denials allowed through in `shadow` mode.
 Use `shadow` with `LOG_LEVEL=INFO` to review a policy before enforcing it.
 Logs and denial responses include `policy_version`.
+
+## Outbound authentication to SMD
+
+`SMD_AUTH_PROVIDER` selects authentication for requests PCS sends to SMD,
+independently of incoming authentication. The default `oauth2` retains the
+existing `OAUTH2_*` client credentials settings and sends no token when they
+are unset. Selecting `tokensmith` ignores those settings.
+
+```sh
+SMD_AUTH_PROVIDER=tokensmith
+SMD_TOKENSMITH_URL=https://tokensmith.example
+TOKENSMITH_BOOTSTRAP_TOKEN=<bootstrap-token>
+```
+
+Provision a bootstrap token with the audience and scopes required by SMD.
+SMD must trust TokenSmith's signing keys. PCS exchanges the bootstrap token
+at startup, caches the service token, and refreshes it as needed for outbound
+requests. Concurrent requests share the token and serialize refreshes. PCS
+does not forward the incoming caller's token.
+
+Bootstrap tokens are single use. A crash, node drain, or rolling update requires
+a new token. Reusing the old token causes startup to fail on every restart. Use
+mTLS service identity for unattended production restarts, or automate provisioning
+a fresh bootstrap token for each startup. For mTLS, set
+`TOKENSMITH_SERVICE_IDENTITY_CERT` and `TOKENSMITH_SERVICE_IDENTITY_KEY` to
+mounted PEM files.
+The certificate pair takes precedence over a bootstrap token and requires HTTPS.
+These credential variables are read directly by the TokenSmith client and have
+no CLI flags.
+
+| Flag | Environment variable | Default |
+| --- | --- | --- |
+| `--smd-auth-provider` | `SMD_AUTH_PROVIDER` | `oauth2` |
+| `--smd-tokensmith-url` | `SMD_TOKENSMITH_URL` | empty |
+| `--smd-tokensmith-ca-file` | `SMD_TOKENSMITH_CA_FILE` | empty (system trust) |
+
+The optional CA file adds trusted certificates for the TokenSmith connection.
+SMD's existing TLS settings are unchanged. Invalid credentials or a failed
+initial exchange prevent startup. Refresh failures fail the outbound request
+without falling back to unauthenticated access. When the refresh session expires,
+mTLS clients create a new session using the current certificate files.
+Bootstrap-only clients require a restart with a new bootstrap token. Once token
+acquisition fails, readiness returns `503` and health reports SMD as unresponsive.
+Liveness remains healthy, so it does not trigger a Kubernetes restart.
+
+Bootstrap exchange makes one attempt because a lost response may mean the token
+was already consumed. mTLS session establishment retains retries. Use HTTPS for
+TokenSmith connections. PCS logs a warning for plaintext HTTP and for settings
+ignored by the selected outbound provider.
