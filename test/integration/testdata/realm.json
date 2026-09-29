@@ -1,0 +1,59 @@
+{
+  "realm": "pcs-auth-test",
+  "enabled": true,
+  "sslRequired": "none",
+  "accessTokenLifespan": 300,
+  "clientScopes": [
+    {
+      "name": "pcs-test",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true"},
+      "protocolMappers": [
+        {
+          "name": "test-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "pcs-smd-test",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "pcs-service",
+      "secret": "pcs-service-test-secret",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": ["basic"],
+      "optionalClientScopes": ["pcs-test"],
+      "attributes": {"access.token.lifespan": "30"}
+    },
+    {
+      "clientId": "test-caller",
+      "secret": "test-caller-secret",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": ["basic"],
+      "optionalClientScopes": ["pcs-test"]
+    },
+    {
+      "clientId": "expired-caller",
+      "secret": "expired-caller-secret",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "defaultClientScopes": ["basic"],
+      "optionalClientScopes": ["pcs-test"],
+      "attributes": {"access.token.lifespan": "5"}
+    }
+  ]
+}
