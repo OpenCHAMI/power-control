@@ -22,6 +22,11 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      # Docker 28 fails to resolve uncached base images through the BuildKit API.
+      - uses: docker/setup-docker-action@v4
+        with:
+          version: v29.8.1
+          set-host: true
       - name: Run integration tests
         env:
           STORAGE: ${{ matrix.storage }}
