@@ -14,12 +14,9 @@ import (
 func (s *StorageTestSuite) TestGetPowerStatusMaster() {
 	t := s.T()
 	// We make the assumption that we are dealing a clean DB here, we may not be!
-	_, err := s.sp.GetPowerStatusMaster()
-	require.Error(t, err)
-
-	// Ensure that the contains the magic string that indicates the power status master does not exist!
-	// This what is expected from the ETCD implementaton this should be reworked!
-	require.Contains(t, err.Error(), "does not exist")
+	lastUpdated, err := s.sp.GetPowerStatusMaster()
+	require.NoError(t, err)
+	require.Nil(t, lastUpdated)
 
 }
 
@@ -32,7 +29,7 @@ func (s *StorageTestSuite) TestStorePowerStatusMaster() {
 
 	lastUpdated, err := s.sp.GetPowerStatusMaster()
 	require.NoError(t, err)
-	require.WithinDuration(t, now, lastUpdated, time.Microsecond, "Stored power status master timestamp does not match the retrieved timestamp")
+	require.WithinDuration(t, now, *lastUpdated, time.Microsecond, "Stored power status master timestamp does not match the retrieved timestamp")
 }
 
 func (s *StorageTestSuite) TestTASPowerStatusMaster() {
@@ -51,7 +48,7 @@ func (s *StorageTestSuite) TestTASPowerStatusMaster() {
 	// Now test with a value that is equal to the stored value
 	lastUpdated, err := s.sp.GetPowerStatusMaster()
 	require.NoError(t, err)
-	require.WithinDuration(t, newVal, lastUpdated, time.Microsecond, "Stored power status master timestamp does not match the retrieved timestamp")
+	require.WithinDuration(t, newVal, *lastUpdated, time.Microsecond, "Stored power status master timestamp does not match the retrieved timestamp")
 
 	// Now test with a value is differen from the stored value
 	result, err = s.sp.TASPowerStatusMaster(now, time.Now())
@@ -61,7 +58,7 @@ func (s *StorageTestSuite) TestTASPowerStatusMaster() {
 	// Now test the value has not changed
 	lastUpdated, err = s.sp.GetPowerStatusMaster()
 	require.NoError(t, err)
-	require.WithinDuration(t, newVal, lastUpdated, time.Microsecond, "Stored power status master timestamp does not match the retrieved timestamp")
+	require.WithinDuration(t, newVal, *lastUpdated, time.Microsecond, "Stored power status master timestamp does not match the retrieved timestamp")
 }
 
 func (s *StorageTestSuite) TestStorePowerStatus() {
@@ -111,8 +108,9 @@ func (s *StorageTestSuite) TestDeletePowerStatus() {
 	err = s.sp.DeletePowerStatus(ps.XName)
 	require.NoError(t, err)
 
-	_, err = s.sp.GetPowerStatus(ps.XName)
-	require.Error(t, err, "Expected error when retrieving deleted power status")
+	retrieved, err := s.sp.GetPowerStatus(ps.XName)
+	require.NoError(t, err)
+	require.Nil(t, retrieved)
 }
 
 func (s *StorageTestSuite) TestGetPowerStatusAll() {

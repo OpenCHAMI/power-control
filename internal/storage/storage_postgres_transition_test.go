@@ -89,7 +89,7 @@ func (s *StorageTestSuite) TestTransitionSetGet() {
 
 	gotTask, err := s.sp.GetTransitionTask(task.TransitionID, task.TaskID)
 	s.Require().NoError(err)
-	s.Require().Equal(task, gotTask)
+	s.Require().Equal(&task, gotTask)
 
 	gotTasks, err := s.sp.GetAllTasksForTransition(testTransition.TransitionID)
 	for _, t := range gotTasks {
@@ -236,18 +236,18 @@ func (s *StorageTestSuite) TestTransitionTAS() {
 	s.Require().NoError(err)
 	s.Require().True(slices.Equal(testTransition.Location, gotTransition.Location))
 
-	modTransition := gotTransition
+	modTransition := *gotTransition
 	modTransition.Status = model.TransitionStatusAborted
 
 	// nothing should have touched the original, this change should succeed
 	t.Logf("updating transition %s", testTransition.TransitionID)
-	changed, err := s.sp.TASTransition(modTransition, gotTransition)
+	changed, err := s.sp.TASTransition(modTransition, *gotTransition)
 	s.Require().NoError(err)
 	s.Require().True(changed)
 
 	// the change succeeded, testing against the original should now fail
 	modTransition.Status = model.TransitionStatusNew
-	changed, err = s.sp.TASTransition(modTransition, gotTransition)
+	changed, err = s.sp.TASTransition(modTransition, *gotTransition)
 	s.Require().NoError(err)
 	s.Require().False(changed)
 
@@ -258,7 +258,7 @@ func (s *StorageTestSuite) TestTransitionTAS() {
 
 	modTransition.TransitionID = uuid.New()
 	t.Logf("attempting TAS on non-existent transition %s", modTransition.TransitionID)
-	changed, err = s.sp.TASTransition(modTransition, gotTransition)
+	changed, err = s.sp.TASTransition(modTransition, *gotTransition)
 	s.Require().NoError(err)
 	s.Require().False(changed)
 }
