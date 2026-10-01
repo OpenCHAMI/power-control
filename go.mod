@@ -3,7 +3,7 @@ module github.com/openchami/power-control/v2
 go 1.26.5
 
 // Pending https://github.com/testcontainers/testcontainers-go/pull/3899.
-replace github.com/testcontainers/testcontainers-go => github.com/cjh1/testcontainers-go v0.0.0-20260917190651-3cd90862e185
+replace github.com/testcontainers/testcontainers-go => github.com/cjh1/testcontainers-go v0.0.0-20260910075618-33eefc1e9614
 
 //todo hms-base needs to be converted to hms-xname as soon as that package is available.
 
