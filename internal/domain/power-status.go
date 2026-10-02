@@ -1052,10 +1052,10 @@ func getPowerStatusMaster() bool {
 	now := time.Now()
 	lastUpdated, err := kvStore.GetPowerStatusMaster()
 	if err != nil {
-		if !strings.Contains(err.Error(), "does not exist") {
-			glogger.Errorf("ERROR getting power status master: %v", err)
-			return false
-		}
+		glogger.Errorf("ERROR getting power status master: %v", err)
+		return false
+	}
+	if lastUpdated == nil {
 		// First master. Just set the value to take master.
 		err = kvStore.StorePowerStatusMaster(now)
 		if err != nil {
@@ -1068,7 +1068,7 @@ func getPowerStatusMaster() bool {
 			// Someone else is master
 			return false
 		}
-		success, err := kvStore.TASPowerStatusMaster(now, lastUpdated)
+		success, err := kvStore.TASPowerStatusMaster(now, *lastUpdated)
 		if err != nil {
 			// ETCD error we're not getting master this time
 			glogger.Errorf("ERROR while trying to become the power status master: %v", err)

@@ -191,7 +191,7 @@ func TestDoPowerCapTask(t *testing.T) {
 		return
 	}
 	expiredTask.AutomaticExpirationTime = time.Now().Add(-3 * time.Second)
-	err = GLOB.DSP.StorePowerCapTask(expiredTask)
+	err = GLOB.DSP.StorePowerCapTask(*expiredTask)
 	if err != nil {
 		t.Errorf("ERROR powerCapReaper() failed - %s", err.Error())
 		return

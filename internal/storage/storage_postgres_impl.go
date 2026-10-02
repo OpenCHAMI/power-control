@@ -139,23 +139,20 @@ func (p *PostgresStorage) Ping() error {
 	return nil
 }
 
-func (p *PostgresStorage) GetPowerStatusMaster() (lastUpdated time.Time, err error) {
+func (p *PostgresStorage) GetPowerStatusMaster() (*time.Time, error) {
+	var lastUpdated time.Time
 	exec := `SELECT last_updated FROM power_status_master`
-	err = p.db.Get(&lastUpdated, exec)
+	err := p.db.Get(&lastUpdated, exec)
 
 	if err != nil {
-		// If the error is sql.ErrNoRows, no power status master exists.
-		// domain:getPowerStatusMaster() relies on the storage engine errors containing
-		// "power status master does not exist" for part of its control flow.
-		// We should consider indicating this condition explicitly in the interface function signature instead.
 		if errors.Is(err, sql.ErrNoRows) {
-			return time.Time{}, errors.New("power status master does not exist")
+			return nil, nil
 		}
 
-		return time.Time{}, fmt.Errorf("failed to get power status master: %w", err)
+		return nil, fmt.Errorf("failed to get power status master: %w", err)
 	}
 
-	return lastUpdated, nil
+	return &lastUpdated, nil
 }
 
 func (p *PostgresStorage) StorePowerStatusMaster(now time.Time) error {
@@ -274,28 +271,26 @@ func (pscDB *powerStatusComponentDB) fromPowerStatusComponent(psc model.PowerSta
 	pscDB.SupportedPowerTransitions = pq.StringArray(psc.SupportedPowerTransitions)
 }
 
-func (p *PostgresStorage) GetPowerStatus(xname string) (psc model.PowerStatusComponent, err error) {
+func (p *PostgresStorage) GetPowerStatus(xname string) (*model.PowerStatusComponent, error) {
 	if !(xnametypes.IsHMSCompIDValid(xname)) {
-		return psc, fmt.Errorf("invalid xname: %s", xname)
+		return nil, fmt.Errorf("invalid xname: %s", xname)
 	}
 
 	var pscDB powerStatusComponentDB
 
-	err = p.db.Get(&pscDB, "SELECT * FROM power_status_component WHERE xname = $1", xname)
+	err := p.db.Get(&pscDB, "SELECT * FROM power_status_component WHERE xname = $1", xname)
 	if err != nil {
-		// Calling control flow code expects error containing "does not exist"
-		// We should consider indicating this condition explicitly in the interface function signature instead.
 		if errors.Is(err, sql.ErrNoRows) {
-			return model.PowerStatusComponent{}, fmt.Errorf("power status does not exist")
+			return nil, nil
 		}
 
-		return model.PowerStatusComponent{}, err
+		return nil, err
 	}
 
 	// Convert to model struct
-	psc = pscDB.toPowerStatusComponent()
+	psc := pscDB.toPowerStatusComponent()
 
-	return psc, nil
+	return &psc, nil
 }
 
 // toPowerStatusComponents converts a slice of powerStatusComponentDB to a slice of model.PowerStatusComponent
@@ -410,32 +405,33 @@ func (p *PostgresStorage) StorePowerCapOperation(op model.PowerCapOperation) err
 	return nil
 }
 
-func (p *PostgresStorage) GetPowerCapTask(taskID uuid.UUID) (model.PowerCapTask, error) {
+func (p *PostgresStorage) GetPowerCapTask(taskID uuid.UUID) (*model.PowerCapTask, error) {
 	var task model.PowerCapTask
 	err := p.db.Get(&task, "SELECT * FROM power_cap_tasks WHERE id = $1", taskID)
 	if err != nil {
-		// Calling control flow code expects error containing "does not exist"
-		// We should consider indicating this condition explicitly in the interface function signature instead.
 		if errors.Is(err, sql.ErrNoRows) {
-			return model.PowerCapTask{}, fmt.Errorf("power cap task does not exist")
+			return nil, nil
 		}
 
-		return model.PowerCapTask{}, fmt.Errorf("could not retrieve power cap task %s: %w", taskID, err)
+		return nil, fmt.Errorf("could not retrieve power cap task %s: %w", taskID, err)
 	}
 
-	return task, nil
+	return &task, nil
 }
 
-func (p *PostgresStorage) GetPowerCapOperation(_ uuid.UUID, opID uuid.UUID) (model.PowerCapOperation, error) {
+func (p *PostgresStorage) GetPowerCapOperation(_ uuid.UUID, opID uuid.UUID) (*model.PowerCapOperation, error) {
 	// this function never actually gets used :( downstream code only uses GetAllPowerCapOperationsForTask
 	var op model.PowerCapOperation
 	// the first ID is the task ID. etcd needs this to build the op key, we toss it
 	err := p.db.Get(&op, "SELECT * FROM power_cap_operations WHERE id = $1", opID)
 	if err != nil {
-		return model.PowerCapOperation{}, fmt.Errorf("could not retrieve power cap operation %s: %w", opID, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("could not retrieve power cap operation %s: %w", opID, err)
 	}
 
-	return op, nil
+	return &op, nil
 }
 
 func (p *PostgresStorage) GetAllPowerCapOperationsForTask(taskID uuid.UUID) ([]model.PowerCapOperation, error) {
@@ -574,30 +570,33 @@ func (p *PostgresStorage) StoreTransitionTask(op model.TransitionTask) error {
 
 //
 
-func (p *PostgresStorage) GetTransition(transitionID uuid.UUID) (transition model.Transition, transitionFirstPage model.Transition, err error) {
-	err = p.db.Get(&transition, "SELECT * FROM transitions WHERE id = $1", transitionID)
+func (p *PostgresStorage) GetTransition(transitionID uuid.UUID) (*model.Transition, *model.Transition, error) {
+	var transition model.Transition
+	err := p.db.Get(&transition, "SELECT * FROM transitions WHERE id = $1", transitionID)
 	if err != nil {
-		// Calling control flow code expects error containing "does not exist"
-		// We should consider indicating this condition explicitly in the interface function signature instead.
 		if errors.Is(err, sql.ErrNoRows) {
-			return model.Transition{}, model.Transition{}, fmt.Errorf("transition does not exist")
+			return nil, nil, nil
 		}
 
-		return model.Transition{}, model.Transition{}, err
+		return nil, nil, err
 	}
-	return transition, transition, nil
+	firstPage := model.CopyTransition(transition)
+	return &transition, &firstPage, nil
 }
 
 // more etcd leakage. this needs the transition ID because you can't build
 // the etcd key for a task without the transition that owns it
 
-func (p *PostgresStorage) GetTransitionTask(_ uuid.UUID, taskID uuid.UUID) (model.TransitionTask, error) {
+func (p *PostgresStorage) GetTransitionTask(_ uuid.UUID, taskID uuid.UUID) (*model.TransitionTask, error) {
 	var task model.TransitionTask
 	err := p.db.Get(&task, "SELECT * FROM transition_tasks WHERE id = $1", taskID)
 	if err != nil {
-		return model.TransitionTask{}, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
 	}
-	return task, nil
+	return &task, nil
 }
 
 func (p *PostgresStorage) GetAllTasksForTransition(transitionID uuid.UUID) ([]model.TransitionTask, error) {

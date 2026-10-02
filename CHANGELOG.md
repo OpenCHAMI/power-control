@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Distinguish missing storage records from backend errors without matching error messages,
+  preserving 404 responses and safely stopping workers when records are missing ([#39](https://github.com/OpenCHAMI/power-control/issues/39)).
+- Preserve tasks, locations, and task IDs in transition snapshots used for compare-and-set updates.
+- Propagate etcd lookup and transition page-read errors instead of masking them.
 - Fixed bug in CT tests related to race condition with compressed transitions ( upstream CASMHMS-6408 )
 - Updated Swagger spec to indicate transition tasks only present if not yet compressed ( upstream CASMHMS-6408 )
 

@@ -163,7 +163,7 @@ func TestMaxTransition(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to read large transtion. TransitionID: %s, size: %d, Error: %s", transition.TransitionID, size, err)
 	}
-	storedSize, _ := getSize(storedTransition)
+	storedSize, _ := getSize(*storedTransition)
 	t.Logf("TestMaxTransition: TransitionID: %s, storedSize: %d", transition.TransitionID, storedSize)
 }
 
