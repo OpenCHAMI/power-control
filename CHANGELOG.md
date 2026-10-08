@@ -8,6 +8,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.2] - 2026-10-08
+
+### Fixed
+
+- Pass the configured authenticated HTTP client to SMD reservation requests so
+  they include the expected bearer token.
+- Fix HSM provider access during power state updates.
+
+### Changed
+
+- Normalize the Go module path to lowercase: `github.com/openchami/power-control/v2`.
+- Update Go module and build image dependencies.
+
+## [2.12.1] - 2026-06-12
+
+### Added
+
+- Allow SMD metadata to be updated.
+
+### Changed
+
+- Consolidate multi-architecture container builds.
+- Update Go module and image dependencies.
+
+## [2.12.0] - 2026-01-21
+
+### Added
+
+- Added support for using an OAuth2 client to access SMD.
+
+### Fixed
+
+- Correct Redfish outlet information and scope handling.
+- Fix ARM cross-compilation for release builds.
+
+### Changed
+
+- Update to the latest SMD and use the exec form for the container command.
+
+## [2.11.1] - 2025-11-07
+
+### Changed
+
+- Update SMD container images.
+
+## [2.11.0] - 2025-10-24
+
+### Added
+
+- Added a fake Vault drop-in credential store to set credentials from the environment.
+
+## [2.10.0] - 2025-10-03
+
+### Added
+
+- Propagate PCS power state updates to SMD.
+
+## [2.9.0] - 2025-09-26
+
 ### Update
 
 - Updated image and module dependencies to latest versions
@@ -19,9 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add PostgreSQL storage for power status, power caps, transitions, and distributed locks.
+- Add JWT authentication with JWKS URL configuration.
 - Added support for pprof builds
-- Added a fake Vault drop-in credential store to set credentials from the environment.
-- Added support for using an OAuth2 client to access SMD.
+- Add the `power-control-init` command.
 
 ### Changes
 
@@ -36,6 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed bug in CT tests related to race condition with compressed transitions ( upstream CASMHMS-6408 )
 - Updated Swagger spec to indicate transition tasks only present if not yet compressed ( upstream CASMHMS-6408 )
+- Fix compressed transition handling and its SQL default (upstream CASMHMS-6408).
+- Include database migrations in the application image.
 
 ## [2.7.0] - 2025-1-22
 
