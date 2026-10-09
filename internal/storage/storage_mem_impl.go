@@ -82,7 +82,7 @@ func (m *MEMStorage) Ping() error {
 	return e.Ping()
 }
 
-func (m *MEMStorage) GetPowerStatusMaster() (time.Time, error) {
+func (m *MEMStorage) GetPowerStatusMaster() (*time.Time, error) {
 	e := toETCDStorage(m)
 	return e.GetPowerStatusMaster()
 }
@@ -107,7 +107,7 @@ func (m *MEMStorage) DeletePowerStatus(xname string) error {
 	return e.DeletePowerStatus(xname)
 }
 
-func (m *MEMStorage) GetPowerStatus(xname string) (model.PowerStatusComponent, error) {
+func (m *MEMStorage) GetPowerStatus(xname string) (*model.PowerStatusComponent, error) {
 	e := toETCDStorage(m)
 	return e.GetPowerStatus(xname)
 }
@@ -136,12 +136,12 @@ func (m *MEMStorage) StorePowerCapOperation(op model.PowerCapOperation) error {
 	return e.StorePowerCapOperation(op)
 }
 
-func (m *MEMStorage) GetPowerCapTask(taskID uuid.UUID) (model.PowerCapTask, error) {
+func (m *MEMStorage) GetPowerCapTask(taskID uuid.UUID) (*model.PowerCapTask, error) {
 	e := toETCDStorage(m)
 	return e.GetPowerCapTask(taskID)
 }
 
-func (m *MEMStorage) GetPowerCapOperation(taskID uuid.UUID, opID uuid.UUID) (model.PowerCapOperation, error) {
+func (m *MEMStorage) GetPowerCapOperation(taskID uuid.UUID, opID uuid.UUID) (*model.PowerCapOperation, error) {
 	e := toETCDStorage(m)
 	return e.GetPowerCapOperation(taskID, opID)
 }
@@ -180,12 +180,12 @@ func (m *MEMStorage) StoreTransitionTask(op model.TransitionTask) error {
 	return e.StoreTransitionTask(op)
 }
 
-func (m *MEMStorage) GetTransition(transitionID uuid.UUID) (transition model.Transition, transitionFirstPage model.Transition, err error) {
+func (m *MEMStorage) GetTransition(transitionID uuid.UUID) (transition *model.Transition, transitionFirstPage *model.Transition, err error) {
 	e := toETCDStorage(m)
 	return e.GetTransition(transitionID)
 }
 
-func (m *MEMStorage) GetTransitionTask(transitionID uuid.UUID, taskID uuid.UUID) (model.TransitionTask, error) {
+func (m *MEMStorage) GetTransitionTask(transitionID uuid.UUID, taskID uuid.UUID) (*model.TransitionTask, error) {
 	e := toETCDStorage(m)
 	return e.GetTransitionTask(transitionID, taskID)
 }

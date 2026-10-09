@@ -26,6 +26,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -381,14 +382,9 @@ func (ts TaskState) EnumIndex() int {
 func CopyTransition(transition Transition) Transition {
 	result := transition
 
-	result.Tasks = make([]TransitionTaskResp, 0)
-	copy(result.Tasks, transition.Tasks)
-
-	result.Location = make([]LocationParameter, 0)
-	copy(result.Location, transition.Location)
-
-	copy(result.TaskIDs, transition.TaskIDs)
-	result.TaskIDs = make([]uuid.UUID, 0)
+	result.Tasks = slices.Clone(transition.Tasks)
+	result.Location = slices.Clone(transition.Location)
+	result.TaskIDs = slices.Clone(transition.TaskIDs)
 
 	return result
 
