@@ -25,7 +25,7 @@ jobs:
       # Docker 28 fails to resolve uncached base images through the BuildKit API.
       - uses: docker/setup-docker-action@v5
         with:
-          version: v29.8.2
+          version: v29.9.0
           set-host: true
       - name: Run integration tests
         env:
