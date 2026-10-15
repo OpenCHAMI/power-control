@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,6 +19,7 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/openchami/power-control/v2/internal/api"
+	"github.com/openchami/power-control/v2/internal/auth"
 	"github.com/openchami/power-control/v2/internal/credstore"
 	"github.com/openchami/power-control/v2/internal/domain"
 	"github.com/openchami/power-control/v2/internal/hsm"
@@ -67,12 +69,18 @@ var (
 	HSM                 hsm.HSMProvider
 	CS                  credstore.CredStoreProvider
 	DLOCK               storage.DistributedLockProvider
-	jwksURL             string
-	jwksFetchInterval   int = 5
+)
+
+const (
+	authProviderJWKS       = "jwks"
+	authProviderTokenSmith = "tokensmith"
 )
 
 // pcsConfig holds the configuration for the Power Control Service (PCS).
 type pcsConfig struct {
+	authProvider       string
+	jwksURL            string
+	tokensmith         auth.TokensmithConfig
 	fakeVaultEnabled   bool
 	vaultEnabled       bool
 	vaultKeypath       string
@@ -107,8 +115,25 @@ type oauth2Config struct {
 }
 
 // runPCS runs the Power Control Service (PCS).
-func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2Config *oauth2Config) {
-	logger.Log.Error()
+func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2Config *oauth2Config) error {
+	var authentication auth.Auth
+	var err error
+	switch pcs.authProvider {
+	case authProviderJWKS:
+		jwksURL := pcs.jwksURL
+		if url := os.Getenv("PCS_JWKS_URL"); url != "" {
+			jwksURL = url
+		}
+		authentication, err = auth.NewJWKSAuth(ctx, auth.JWKSConfig{JWKSURL: jwksURL})
+	case authProviderTokenSmith:
+		authentication, err = auth.NewTokenSmithAuth(ctx, pcs.tokensmith)
+	default:
+		return fmt.Errorf("invalid auth-provider %q: use jwks or tokensmith", pcs.authProvider)
+	}
+	if err != nil {
+		return err
+	}
+	router := api.NewRouter(authentication)
 
 	serviceName, err := base.GetServiceInstanceName()
 	if err != nil {
@@ -551,26 +576,6 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, 
 			maxIdleConnsPerHost = tps
 		}
 	}
-	envstr = os.Getenv("PCS_JWKS_URL")
-	if envstr != "" {
-		jwksURL = envstr
-	}
-
-	// Initialize token authorization and load JWKS well-knowns from .well-known endpoint
-	if jwksURL != "" {
-		logger.Log.Info("Fetching public key from server...")
-		for i := 0; i <= 5; i++ {
-			err = api.FetchPublicKeyFromURL(jwksURL)
-			if err != nil {
-				logger.Log.Errorf("Failed to initialize auth token: %v", err)
-				time.Sleep(time.Duration(jwksFetchInterval) * time.Second)
-				continue
-			}
-			logger.Log.Info("Initialized the auth token successfully.")
-			break
-		}
-	}
-
 	domain.PowerStatusMonitorInit(&domainGlobals,
 		(time.Duration(dlockTimeout) * time.Second),
 		logger.Log, (time.Duration(pwrSampleInterval) * time.Second),
@@ -622,7 +627,7 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, 
 	}
 	//Rest Server
 	waitGroup.Add(1)
-	doRest(defaultPORT)
+	doRest(defaultPORT, router)
 
 	//////////////////////
 	// WAIT FOR GOD
@@ -633,16 +638,14 @@ func runPCS(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, 
 	<-idleConnsClosed
 	logger.Log.Info("Done. Exiting.")
 
+	return nil
 }
 
-func doRest(serverPort string) {
+func doRest(serverPort string, handler http.Handler) {
 
 	logger.Log.Info("**RUNNING -- Listening on " + defaultPORT)
 
-	srv := &http.Server{Addr: ":" + serverPort}
-	router := api.NewRouter()
-
-	http.Handle("/", router)
+	srv := &http.Server{Addr: ":" + serverPort, Handler: handler}
 
 	go func() {
 		defer waitGroup.Done()

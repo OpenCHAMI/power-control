@@ -1,0 +1,27 @@
+# Copyright © 2026 OpenCHAMI a Series of LF Projects, LLC
+# SPDX-License-Identifier: MIT
+
+p, role:power-reader, /, read
+p, role:power-reader, /transitions, read
+p, role:power-reader, /transitions/*, read
+p, role:power-reader, /power-status, read
+p, role:power-reader, /power-cap, read
+p, role:power-reader, /power-cap/*, read
+p, role:power-reader, /v1, read
+p, role:power-reader, /v1/transitions, read
+p, role:power-reader, /v1/transitions/*, read
+p, role:power-reader, /v1/power-status, read
+p, role:power-reader, /v1/power-cap, read
+p, role:power-reader, /v1/power-cap/*, read
+
+# power-operator inherits power-reader through grouping.csv.
+p, role:power-operator, /transitions, write
+p, role:power-operator, /transitions/*, delete
+p, role:power-operator, /power-status, write
+p, role:power-operator, /power-cap, write
+p, role:power-operator, /power-cap/snapshot, write
+p, role:power-operator, /v1/transitions, write
+p, role:power-operator, /v1/transitions/*, delete
+p, role:power-operator, /v1/power-status, write
+p, role:power-operator, /v1/power-cap, write
+p, role:power-operator, /v1/power-cap/snapshot, write

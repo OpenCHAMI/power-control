@@ -34,7 +34,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func RegisterPProfHandlers(router *chi.Mux) {
+func RegisterPProfHandlers(router chi.Router) {
 	// Main profiling entry point
 	router.HandleFunc("/v1/debug/pprof/", pprof.Index) // Index listing all pprof endpoints
 

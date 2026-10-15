@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add optional Tokensmith authentication and authorization.
+
 ## [2.12.2] - 2026-10-08
 
 ### Fixed
@@ -82,7 +86,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add JWT authentication with JWKS URL configuration.
 - Added support for pprof builds
 - Add the `power-control-init` command.
-
 ### Changes
 
 - Replace mux with chi router

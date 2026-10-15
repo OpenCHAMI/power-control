@@ -28,19 +28,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openchami/power-control/v2/internal/auth"
 	"github.com/openchami/power-control/v2/internal/logger"
 
-	jwtauth "github.com/OpenCHAMI/jwtauth/v5"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	openchami_authenticator "github.com/openchami/chi-middleware/auth"
 	openchami_logger "github.com/openchami/chi-middleware/log"
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
 )
-
-// JWT
-var tokenAuth *jwtauth.JWTAuth
 
 // Route - struct containing name,method, pattern and handlerFunction to invoke.
 type Route struct {
@@ -82,54 +78,41 @@ func Logger(inner http.Handler, name string) http.Handler {
 	})
 }
 
-// NewRouter - create a new chi Router; and initializes it with the routes
-func NewRouter() *chi.Mux {
+// NewRouter registers public and protected routes with request logging.
+func NewRouter(authentication auth.Auth) *chi.Mux {
 	router := chi.NewRouter()
 	// Setup logger
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	logger := zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	router.Use(middleware.RedirectSlashes)
+	router.Use(middleware.RequestID)
 	router.Use(openchami_logger.OpenCHAMILogger(logger))
 
-	if tokenAuth != nil {
-		router.Route("/", func(r chi.Router) {
-			r.Use(
-				jwtauth.Verifier(tokenAuth),
-				openchami_authenticator.AuthenticatorWithRequiredClaims(tokenAuth, []string{"sub", "iss", "aud"}),
-			)
-			// Setup JWT auth only for the specified protected routes
-			for _, route := range protectedRoutes {
-				var handler http.Handler = route.HandlerFunc
-				handler = Logger(handler, route.Name)
+	protected := router.With(authentication.Wrap)
+	registerRoutes(router, protected)
+	RegisterPProfHandlers(router)
 
-				r.Method(route.Method, route.Pattern, handler)
+	return router
+}
 
-				// With v1
-				r.Method(route.Method, "/v1"+route.Pattern, handler)
-			}
-		})
-	} else {
-		// Append protected routes to public routes if JWT auth is disabled
-		publicRoutes = append(publicRoutes, protectedRoutes...)
+func registerRoutes(public, protected chi.Router) {
+	for _, route := range protectedRoutes {
+		handler := Logger(route.HandlerFunc, route.Name)
+		protected.Method(route.Method, route.Pattern, handler)
+		protected.Method(route.Method, "/v1"+route.Pattern, handler)
 	}
 
-	// Setup JWT auth only for all public routes
+	// Health routes bypass authentication and authorization.
 	for _, route := range publicRoutes {
 		var handler http.Handler = route.HandlerFunc
 		handler = Logger(handler, route.Name)
 
-		router.Method(route.Method, route.Pattern, handler)
+		public.Method(route.Method, route.Pattern, handler)
 
 		// With v1
-		router.Method(route.Method, "/v1"+route.Pattern, handler)
+		public.Method(route.Method, "/v1"+route.Pattern, handler)
 	}
-
-	// If the 'pprof' build tag is set, then this will register pprof handlers,
-	// otherwise this function is stubbed and will do nothing.
-	RegisterPProfHandlers(router)
-
-	return router
 }
 
 var protectedRoutes = Routes{
