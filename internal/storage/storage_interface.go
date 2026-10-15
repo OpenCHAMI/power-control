@@ -35,19 +35,19 @@ type StorageProvider interface {
 	Init(Logger *logrus.Logger) error
 	Ping() error
 
-	GetPowerStatusMaster() (time.Time, error)
+	GetPowerStatusMaster() (*time.Time, error)
 	StorePowerStatusMaster(now time.Time) error
 	TASPowerStatusMaster(now time.Time, testVal time.Time) (bool, error)
 	StorePowerStatus(p model.PowerStatusComponent) error
 	DeletePowerStatus(xname string) error
-	GetPowerStatus(xname string) (model.PowerStatusComponent, error)
+	GetPowerStatus(xname string) (*model.PowerStatusComponent, error)
 	GetAllPowerStatus() (model.PowerStatus, error)
 	GetPowerStatusHierarchy(xname string) (model.PowerStatus, error)
 
 	StorePowerCapTask(task model.PowerCapTask) error
 	StorePowerCapOperation(op model.PowerCapOperation) error
-	GetPowerCapTask(taskID uuid.UUID) (model.PowerCapTask, error)
-	GetPowerCapOperation(taskID uuid.UUID, opID uuid.UUID) (model.PowerCapOperation, error)
+	GetPowerCapTask(taskID uuid.UUID) (*model.PowerCapTask, error)
+	GetPowerCapOperation(taskID uuid.UUID, opID uuid.UUID) (*model.PowerCapOperation, error)
 	GetAllPowerCapOperationsForTask(taskID uuid.UUID) ([]model.PowerCapOperation, error)
 	GetAllPowerCapTasks() ([]model.PowerCapTask, error)
 	DeletePowerCapTask(taskID uuid.UUID) error
@@ -55,8 +55,8 @@ type StorageProvider interface {
 
 	StoreTransition(transition model.Transition) error
 	StoreTransitionTask(task model.TransitionTask) error
-	GetTransition(transitionID uuid.UUID) (transition model.Transition, transtiionFirstPage model.Transition, err error)
-	GetTransitionTask(transitionID uuid.UUID, taskID uuid.UUID) (model.TransitionTask, error)
+	GetTransition(transitionID uuid.UUID) (transition *model.Transition, transitionFirstPage *model.Transition, err error)
+	GetTransitionTask(transitionID uuid.UUID, taskID uuid.UUID) (*model.TransitionTask, error)
 	GetAllTasksForTransition(transitionID uuid.UUID) ([]model.TransitionTask, error)
 	GetAllTransitions() ([]model.Transition, error)
 	DeleteTransition(transitionID uuid.UUID) error

@@ -11,3 +11,7 @@ func (s *StorageTestSuite) TestStorageProviderPing() {
 	err := s.sp.Ping()
 	require.NoError(t, err, "Storage Ping() should not have failed")
 }
+
+func (s *StorageTestSuite) TestMissingEntities() {
+	testMissingEntities(s.T(), s.sp, false)
+}

@@ -276,18 +276,15 @@ func GetPowerCapQuery(taskID uuid.UUID) (pb model.Passback) {
 	// Get the task
 	task, err := GLOB.DSP.GetPowerCapTask(taskID)
 	if err != nil {
-		if strings.Contains(err.Error(), "does not exist") {
-			pb = model.BuildErrorPassback(http.StatusNotFound, err)
-		} else {
-			pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
-		}
+		pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
 		logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error retrieving power cap task")
 		return
 	}
-	if task.TaskID.String() != taskID.String() {
+	if task == nil {
 		err := errors.New("TaskID does not exist")
 		pb = model.BuildErrorPassback(http.StatusNotFound, err)
 		logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error retrieving power cap task")
+		return
 	}
 	// Compressed tasks don't have operations anymore. No need to look them up.
 	if !task.IsCompressed {
@@ -301,7 +298,7 @@ func GetPowerCapQuery(taskID uuid.UUID) (pb model.Passback) {
 	}
 
 	// Build the response struct
-	rsp := buildPowerCapResponse(task, ops, true)
+	rsp := buildPowerCapResponse(*task, ops, true)
 
 	pb = model.BuildSuccessPassback(http.StatusOK, rsp)
 	return
@@ -399,6 +396,11 @@ func doPowerCapTask(taskID uuid.UUID) {
 		return
 	}
 
+	if task == nil {
+		logger.Log.WithField("taskID", taskID).Info("Power capping task no longer exists")
+		return
+	}
+
 	defer logger.Log.Infof("Power Capping Task %s Completed (%s)",
 		task.TaskID.String(), GLOB.PodName)
 
@@ -449,7 +451,7 @@ func doPowerCapTask(taskID uuid.UUID) {
 		// All xnames were invalid
 		err = errors.New("No xnames to operate on")
 		logrus.WithFields(logrus.Fields{"ERROR": err}).Error("No xnames to operate on")
-		compressAndCompleteTask(task)
+		compressAndCompleteTask(*task)
 		return
 	}
 	// Call again to remove any duplicates
@@ -658,11 +660,11 @@ func doPowerCapTask(taskID uuid.UUID) {
 
 	// Everything failed. We're done here.
 	if len(goodOps) == 0 {
-		compressAndCompleteTask(task)
+		compressAndCompleteTask(*task)
 		return
 	}
 	task.TaskStatus = model.PowerCapTaskStatusInProgress
-	err = GLOB.DSP.StorePowerCapTask(task)
+	err = GLOB.DSP.StorePowerCapTask(*task)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing power capping task")
 	}
@@ -813,7 +815,7 @@ func doPowerCapTask(taskID uuid.UUID) {
 	}
 
 	// Task Complete
-	compressAndCompleteTask(task)
+	compressAndCompleteTask(*task)
 	return
 }
 

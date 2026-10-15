@@ -118,15 +118,11 @@ func GetTransition(transitionID uuid.UUID) (pb model.Passback) {
 	// Get the transition
 	transition, _, err := GLOB.DSP.GetTransition(transitionID)
 	if err != nil {
-		if strings.Contains(err.Error(), "does not exist") {
-			pb = model.BuildErrorPassback(http.StatusNotFound, err)
-		} else {
-			pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
-		}
+		pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
 		logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error retrieving transition")
 		return
 	}
-	if transition.TransitionID.String() != transitionID.String() {
+	if transition == nil {
 		err := errors.New("TransitionID does not exist")
 		pb = model.BuildErrorPassback(http.StatusNotFound, err)
 		logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error retrieving transition")
@@ -144,7 +140,7 @@ func GetTransition(transitionID uuid.UUID) (pb model.Passback) {
 	}
 
 	// Build the response struct
-	rsp := model.ToTransitionResp(transition, tasks, true)
+	rsp := model.ToTransitionResp(*transition, tasks, true)
 
 	pb = model.BuildSuccessPassback(http.StatusOK, rsp)
 	return
@@ -190,18 +186,15 @@ func AbortTransitionID(transitionID uuid.UUID) (pb model.Passback) {
 		// Get the transition
 		transition, transitionFirstPage, err := GLOB.DSP.GetTransition(transitionID)
 		if err != nil {
-			if strings.Contains(err.Error(), "does not exist") {
-				pb = model.BuildErrorPassback(http.StatusNotFound, err)
-			} else {
-				pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
-			}
+			pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
 			logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error retrieving transition")
 			return
 		}
-		if transition.TransitionID.String() != transitionID.String() {
+		if transition == nil {
 			err := errors.New("TransitionID does not exist")
 			pb = model.BuildErrorPassback(http.StatusNotFound, err)
 			logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error retrieving transition")
+			return
 		}
 		if transition.Status == model.TransitionStatusCompleted {
 			err := errors.New("Transition is already finished and cannot be aborted.")
@@ -215,7 +208,7 @@ func AbortTransitionID(transitionID uuid.UUID) (pb model.Passback) {
 		}
 		transition.Status = model.TransitionStatusAbortSignaled
 		// Use test and set to prevent overwriting another thread's store operation.
-		ok, err := GLOB.DSP.TASTransition(transition, transitionFirstPage)
+		ok, err := GLOB.DSP.TASTransition(*transition, *transitionFirstPage)
 		if err != nil {
 			pb = model.BuildErrorPassback(http.StatusInternalServerError, err)
 			logger.Log.WithFields(logrus.Fields{"ERROR": err, "HttpStatusCode": pb.StatusCode}).Error("Error storing new transition")
@@ -276,6 +269,11 @@ func doTransition(transitionID uuid.UUID) {
 		return
 	}
 
+	if tr == nil {
+		logger.Log.WithField("transitionID", transitionID).Info("Transition no longer exists")
+		return
+	}
+
 	defer logger.Log.Infof("Transition %s Completed (%s)",
 		tr.TransitionID.String(), GLOB.PodName)
 
@@ -310,24 +308,24 @@ func doTransition(transitionID uuid.UUID) {
 
 	// Vet and turn the list of requested xnames into a map. This also
 	// checks for previously created tasks for restarted transitions.
-	xnameMap, xnames := setupTransitionTasks(&tr)
+	xnameMap, xnames := setupTransitionTasks(tr)
 
 	if len(xnames) == 0 {
 		// All xnames were invalid
 		err = errors.New("No components to operate on")
 		logrus.WithFields(logrus.Fields{"ERROR": err}).Error("No components to operate on")
-		compressAndCompleteTransition(tr, model.TransitionStatusCompleted)
+		compressAndCompleteTransition(*tr, model.TransitionStatusCompleted)
 		return
 	}
 
 	// Store the transition with its initial set of tasks. May have more added later.
 	tr.Status = model.TransitionStatusInProgress
-	abortSignaled, err := storeTransition(tr)
+	abortSignaled, err := storeTransition(*tr)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition")
 	}
 	if abortSignaled {
-		doAbort(tr, xnameMap)
+		doAbort(*tr, xnameMap)
 		return
 	}
 
@@ -388,7 +386,7 @@ func doTransition(transitionID uuid.UUID) {
 		// No xnames found
 		err = errors.New("No xnames to operate on")
 		logrus.WithFields(logrus.Fields{"ERROR": err}).Error("No xnames to operate on")
-		compressAndCompleteTransition(tr, model.TransitionStatusCompleted)
+		compressAndCompleteTransition(*tr, model.TransitionStatusCompleted)
 		return
 	}
 
@@ -545,12 +543,12 @@ func doTransition(transitionID uuid.UUID) {
 		}
 	}
 
-	abortSignaled, err = storeTransition(tr)
+	abortSignaled, err = storeTransition(*tr)
 	if err != nil {
 		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition")
 	}
 	if abortSignaled {
-		doAbort(tr, xnameMap)
+		doAbort(*tr, xnameMap)
 		return
 	}
 
@@ -586,7 +584,7 @@ func doTransition(transitionID uuid.UUID) {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 			}
 		}
-		compressAndCompleteTransition(tr, model.TransitionStatusCompleted)
+		compressAndCompleteTransition(*tr, model.TransitionStatusCompleted)
 		return
 	} else {
 		// Check to see if we got everything back. ReserveComponents returns
@@ -708,9 +706,9 @@ func doTransition(transitionID uuid.UUID) {
 			waitForBMCPower = false
 		}
 
-		abort, _ := checkAbort(tr)
+		abort, _ := checkAbort(*tr)
 		if abort {
-			doAbort(tr, xnameMap)
+			doAbort(*tr, xnameMap)
 			return
 		}
 
@@ -907,9 +905,9 @@ func doTransition(transitionID uuid.UUID) {
 				endState = "on"
 			}
 			for {
-				abort, _ := checkAbort(tr)
+				abort, _ := checkAbort(*tr)
 				if abort {
-					doAbort(tr, xnameMap)
+					doAbort(*tr, xnameMap)
 					return
 				}
 
@@ -918,11 +916,12 @@ func doTransition(transitionID uuid.UUID) {
 				for trsTaskID, comp := range trsTaskMap {
 					// Get the state from ETCD
 					pState, err := GLOB.DSP.GetPowerStatus(comp.Task.Xname)
-					if err != nil {
+					if err != nil || pState == nil {
 						comp.Task.Status = model.TransitionTaskStatusFailed
-						comp.Task.Error = err.Error()
+						comp.Task.Error = "Power status does not exist"
 						comp.Task.StatusDesc = "Failed to confirm transition"
-						if !strings.Contains(err.Error(), "does not exist") {
+						if err != nil {
+							comp.Task.Error = err.Error()
 							// Database error
 							logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error getting power status from database")
 						}
@@ -1011,7 +1010,7 @@ func doTransition(transitionID uuid.UUID) {
 	///////////////////////////////////////////////////////////////////////////
 
 	// Task Complete
-	compressAndCompleteTransition(tr, model.TransitionStatusCompleted)
+	compressAndCompleteTransition(*tr, model.TransitionStatusCompleted)
 	return
 }
 
@@ -1026,14 +1025,12 @@ func storeTransition(tr model.Transition) (bool, error) {
 		// Get the transition
 		_, trOld, err := GLOB.DSP.GetTransition(tr.TransitionID)
 		if err != nil {
-			if !strings.Contains(err.Error(), "does not exist") {
-				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error getting transition")
-				return abort, err
-			}
+			logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error getting transition")
+			return abort, err
 		}
 		tr.LastActiveTime = time.Now()
-		if trOld.TransitionID.String() != tr.TransitionID.String() {
-			//Blank struct, do a normal store.
+		if trOld == nil {
+			// No existing transition, do a normal store.
 			err = GLOB.DSP.StoreTransition(tr)
 			if err != nil {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition")
@@ -1045,7 +1042,7 @@ func storeTransition(tr model.Transition) (bool, error) {
 			abort = true
 		}
 		// Use test and set to prevent overwriting another thread's store operation.
-		ok, err := GLOB.DSP.TASTransition(tr, trOld)
+		ok, err := GLOB.DSP.TASTransition(tr, *trOld)
 		if err != nil {
 			logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition")
 		}
@@ -1063,15 +1060,10 @@ func storeTransition(tr model.Transition) (bool, error) {
 func checkAbort(tr model.Transition) (bool, error) {
 	transition, _, err := GLOB.DSP.GetTransition(tr.TransitionID)
 	if err != nil {
-		if !strings.Contains(err.Error(), "does not exist") {
-			logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error getting transition")
-			return false, err
-		} else {
-			// No abort to check.
-			return false, nil
-		}
+		logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error getting transition")
+		return false, err
 	}
-	if transition.TransitionID.String() != tr.TransitionID.String() {
+	if transition == nil {
 		// No abort to check.
 		return false, nil
 	}
@@ -1114,15 +1106,10 @@ func transitionKeepAlive(transitionID uuid.UUID, cancelChan chan bool) {
 				// Get the transition
 				transition, transitionOld, err := GLOB.DSP.GetTransition(transitionID)
 				if err != nil {
-					if strings.Contains(err.Error(), "does not exist") {
-						logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Transition, %s, does not exist, stopping keep alive thread", transitionID.String())
-						return
-					} else {
-						logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error retreiving Transition, %s, retrying...", transitionID.String())
-						continue
-					}
+					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error retreiving Transition, %s, retrying...", transitionID.String())
+					continue
 				}
-				if transition.TransitionID.String() != transitionID.String() {
+				if transition == nil {
 					err := errors.New("TransitionID does not exist")
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Transition, %s, does not exist, stopping keep alive thread", transitionID.String())
 					return
@@ -1137,7 +1124,7 @@ func transitionKeepAlive(transitionID uuid.UUID, cancelChan chan bool) {
 				// Only change the LastActiveTime
 				transition.LastActiveTime = time.Now()
 				// Use test and set to prevent overwriting another thread's store operation.
-				ok, err := GLOB.DSP.TASTransition(transition, transitionOld)
+				ok, err := GLOB.DSP.TASTransition(*transition, *transitionOld)
 				if err != nil {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error storing Transition, %s, retrying...", transitionID.String())
 					continue
@@ -1179,16 +1166,13 @@ func getPowerStateHierarchy(xnames []string) (map[string]model.PowerStatusCompon
 			case xnametypes.CabinetPDUPowerConnector:
 				pState, err := GLOB.DSP.GetPowerStatus(xname)
 				if err != nil {
-					if strings.Contains(err.Error(), "does not exist") {
-						badList = append(badList, xname)
-						continue
-					} else {
-						// Database error. Bail
-						return nil, nil, err
-					}
-				} else {
-					xnameMap[xname] = pState
+					return nil, nil, err
 				}
+				if pState == nil {
+					badList = append(badList, xname)
+					continue
+				}
+				xnameMap[xname] = *pState
 			case xnametypes.RouterModule:
 				found := false
 				pStates, err := GLOB.DSP.GetPowerStatusHierarchy(xname)
@@ -1843,7 +1827,7 @@ func waitForBMC(compList []*TransitionComponent) {
 			if err != nil {
 				// If everything ends up being an error. We'll just stop waiting.
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Errorf("Error getting power status from database for %s", comp.Task.Xname)
-			} else if strings.ToLower(pState.ManagementState) != model.ManagementStateFilter_available.String() {
+			} else if pState != nil && strings.ToLower(pState.ManagementState) != model.ManagementStateFilter_available.String() {
 				isWaiting = true
 			}
 		}
@@ -1858,7 +1842,7 @@ func getPowerSupplies(hData *hsm.HsmData) (powerSupplies []PowerSupply) {
 	for _, pConnector := range hData.PoweredBy {
 		powerState := model.PowerStateFilter_Undefined
 		pState, err := GLOB.DSP.GetPowerStatus(pConnector)
-		if err == nil {
+		if err == nil && pState != nil {
 			powerState, _ = model.ToPowerStateFilter(pState.PowerState)
 		}
 		powerSupply := PowerSupply{
