@@ -32,7 +32,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -220,8 +219,7 @@ func doSetup() error {
 		Running            bool = true
 		svcClient          *hms_certs.HTTPClientPair
 		TLOC_rf, TLOC_svc  trsapi.TrsAPI
-		rfClientLock       *sync.RWMutex = &sync.RWMutex{}
-		serviceName        string        = "PCS-domain-power-cap-test"
+		serviceName        string = "PCS-domain-power-cap-test"
 		DSP                storage.StorageProvider
 		HSM                hsm.HSMProvider
 		VaultEnabled       bool = false
@@ -278,7 +276,7 @@ func doSetup() error {
 	HSM.Init(&hsmGlob)
 
 	domainGlobals.NewGlobals(&BaseTRSTask, TLOC_rf, TLOC_svc, nil, nil,
-		rfClientLock, &Running, DSP, HSM, VaultEnabled, nil, nil,
+		&Running, DSP, HSM, VaultEnabled, nil, nil,
 		20000, 1440, "power-cap_test-pod")
 	Init(&domainGlobals)
 	return nil

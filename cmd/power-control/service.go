@@ -15,8 +15,6 @@ import (
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/openchami/power-control/v2/internal/api"
 	"github.com/openchami/power-control/v2/internal/auth"
@@ -57,18 +55,15 @@ const (
 )
 
 var (
-	Running                          = true
-	restSrv             *http.Server = nil
-	waitGroup           sync.WaitGroup
-	rfClient, svcClient *hms_certs.HTTPClientPair
-	TLOC_rf, TLOC_svc   trsapi.TrsAPI
-	caURI               string
-	rfClientLock        *sync.RWMutex = &sync.RWMutex{}
-	serviceName         string
-	DSP                 storage.StorageProvider
-	HSM                 hsm.HSMProvider
-	CS                  credstore.CredStoreProvider
-	DLOCK               storage.DistributedLockProvider
+	Running                        = true
+	restSrv           *http.Server = nil
+	waitGroup         sync.WaitGroup
+	TLOC_rf, TLOC_svc trsapi.TrsAPI
+	serviceName       string
+	DSP               storage.StorageProvider
+	HSM               hsm.HSMProvider
+	CS                credstore.CredStoreProvider
+	DLOCK             storage.DistributedLockProvider
 )
 
 const (
@@ -216,12 +211,11 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		logger.Log.Infof("Using TRS_IMPLEMENTATION: LOCAL")
 	}
 
-	//Set up TRS TLOCs and HTTP clients, all insecure to start with
+	// Set up TRS TLOCs and HTTP clients before starting any workers.
 
-	envstr = os.Getenv("PCS_CA_URI")
-	if envstr != "" {
-		logger.Log.Infof("Using PCS_CA_URI: %s", envstr)
-		caURI = envstr
+	caURI := os.Getenv("PCS_CA_URI")
+	if caURI != "" {
+		logger.Log.Infof("Using PCS_CA_URI: %s", caURI)
 	}
 	//These are for debugging/testing
 	envstr = os.Getenv("PCS_VAULT_CA_CHAIN_PATH")
@@ -250,51 +244,9 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 
 	TLOC_rf.Init(serviceName, trsLogger)
 	TLOC_svc.Init(serviceName, trsLogger)
-	rfClient, err := hms_certs.CreateRetryableHTTPClientPair("", dfltMaxHTTPTimeout, dfltMaxHTTPRetries, dfltMaxHTTPBackoff)
+	rfClient, smdClient, err := initHTTPClients(ctx, caURI, TLOC_rf, oauth2Config)
 	if err != nil {
-		logger.Log.Fatalf("Error creating RF HTTP client: %v", err)
-	}
-
-	svcClient, err = hms_certs.CreateRetryableHTTPClientPair("", dfltMaxHTTPTimeout, dfltMaxHTTPRetries, dfltMaxHTTPBackoff)
-	if err != nil {
-		logger.Log.Fatalf("Error creating SMD HTTP client: %v", err)
-	}
-
-	// Chain HTTP clients with OAuth2 if configured
-	if oauth2Config != nil {
-		clientConfig := &clientcredentials.Config{
-			ClientID:     oauth2Config.clientID,
-			ClientSecret: oauth2Config.clientSecret,
-			TokenURL:     oauth2Config.tokenURL,
-			Scopes:       oauth2Config.scopes,
-			AuthStyle:    oauth2.AuthStyleInHeader,
-		}
-
-		logger.Log.Info("Configuring SMD client with OAuth2")
-
-		ctx := context.Background()
-		ts := clientConfig.TokenSource(ctx)
-
-		if c := svcClient.SecureClient; c != nil {
-			baseTransport := c.HTTPClient.Transport
-			if baseTransport == nil {
-				baseTransport = http.DefaultTransport
-			}
-			c.HTTPClient.Transport = &oauth2.Transport{
-				Source: ts,
-				Base:   baseTransport,
-			}
-		}
-		if c := svcClient.InsecureClient; c != nil {
-			baseTransport := c.HTTPClient.Transport
-			if baseTransport == nil {
-				baseTransport = http.DefaultTransport
-			}
-			c.HTTPClient.Transport = &oauth2.Transport{
-				Source: ts,
-				Base:   baseTransport,
-			}
-		}
+		return err
 	}
 
 	//STORAGE/DISTLOCK CONFIGURATION
@@ -367,7 +319,7 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		Running:       &Running,
 		LockEnabled:   pcs.hsmLockEnabled,
 		SMUrl:         pcs.stateManagerServer,
-		SVCHttpClient: svcClient,
+		SVCHttpClient: smdClient,
 	}
 	HSM.Init(&hsmGlob)
 	//TODO: there should be a Ping() to insure HSM is alive
@@ -422,81 +374,9 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 
 	//DOMAIN CONFIGURATION
 	var domainGlobals domain.DOMAIN_GLOBALS
-	domainGlobals.NewGlobals(&BaseTRSTask, TLOC_rf, TLOC_svc, rfClient, svcClient,
-		rfClientLock, &Running, DSP, HSM, pcs.vaultEnabled,
+	domainGlobals.NewGlobals(&BaseTRSTask, TLOC_rf, TLOC_svc, rfClient, smdClient,
+		&Running, DSP, HSM, pcs.vaultEnabled,
 		CS, DLOCK, pcs.maxNumCompleted, pcs.expireTimeMins, podName)
-
-	//Wait for vault PKI to respond for CA bundle.  Once this happens, re-do
-	//the globals.  This goroutine will run forever checking if the CA trust
-	//bundle has changed -- if it has, it will reload it and re-do the globals.
-
-	//Set a flag "CA not ready" that the /liveness and /readiness APIs will
-	//use to signify that PCS is not ready based on the transport readiness.
-
-	go func() {
-		if caURI != "" {
-			var err error
-			var caChain string
-			var prevCaChain string
-			RFTransportReady := false
-
-			tdelay := time.Duration(0)
-			for {
-				time.Sleep(tdelay)
-				tdelay = 3 * time.Second
-
-				caChain, err = hms_certs.FetchCAChain(caURI)
-				if err != nil {
-					logger.Log.Errorf("Error fetching CA chain from Vault PKI: %v, retrying...",
-						err)
-					continue
-				} else {
-					logger.Log.Infof("CA trust chain loaded.")
-				}
-
-				//If chain hasn't changed, do nothing, expand retry time.
-
-				if caChain == prevCaChain {
-					tdelay = 10 * time.Second
-					continue
-				}
-
-				//CA chain accessible.  Re-do the verified transports
-
-				logger.Log.Infof("CA trust chain has changed, re-doing Redfish HTTP transports.")
-				rfClient, err = hms_certs.CreateRetryableHTTPClientPair(caURI, dfltMaxHTTPTimeout, dfltMaxHTTPRetries, dfltMaxHTTPBackoff)
-				if err != nil {
-					logger.Log.Errorf("Error creating TLS-verified transport: %v, retrying...",
-						err)
-					continue
-				}
-				logger.Log.Infof("Locking RF operations...")
-				rfClientLock.Lock() //waits for all RW locks to release
-				tchain := hms_certs.NewlineToTuple(caChain)
-				secInfo := trsapi.TRSHTTPLocalSecurity{CACertBundleData: tchain}
-				err = TLOC_rf.SetSecurity(secInfo)
-				if err != nil {
-					logger.Log.Errorf("Error setting TLOC security info: %v, retrying...",
-						err)
-					rfClientLock.Unlock()
-					continue
-				} else {
-					logger.Log.Info("TRS CA security updated.")
-				}
-				prevCaChain = caChain
-
-				//update RF tloc and rfclient to the global areas! //TODO im not sure what part of this code is still needed; im guessing part of it at least!
-				domainGlobals.RFTloc = TLOC_rf
-				domainGlobals.RFHttpClient = rfClient
-				//hsmGlob.RFTloc = &TLOC_rf
-				//hsmGlob.RFHttpClient = rfClient
-				//HSM.Init(&hsmGlob)
-				rfClientLock.Unlock()
-				RFTransportReady = true
-				domainGlobals.RFTransportReady = &RFTransportReady
-			}
-		}
-	}()
 
 	///////////////////////////////
 	//INITIALIZATION

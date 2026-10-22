@@ -30,7 +30,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -59,8 +58,7 @@ func (ts *Transitions_TS) SetupSuite() {
 		Running           bool = true
 		svcClient         *hms_certs.HTTPClientPair
 		TLOC_rf, TLOC_svc trsapi.TrsAPI
-		rfClientLock      *sync.RWMutex = &sync.RWMutex{}
-		serviceName       string        = "PCS-domain-transitions-test"
+		serviceName       string = "PCS-domain-transitions-test"
 		DSP               storage.StorageProvider
 		DLOCK             storage.DistributedLockProvider
 		HSM               hsm.HSMProvider
@@ -133,7 +131,7 @@ func (ts *Transitions_TS) SetupSuite() {
 	ts.hsmURL = hsmGlob.SMUrl
 
 	domainGlobals.NewGlobals(&BaseTRSTask, TLOC_rf, TLOC_svc, nil, svcClient,
-		rfClientLock, &Running, DSP, HSM, enableVault, CS,
+		&Running, DSP, HSM, enableVault, CS,
 		DLOCK, 20000, 1440, "transitions_test-pod")
 	Init(&domainGlobals)
 

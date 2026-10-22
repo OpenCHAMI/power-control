@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add optional Tokensmith authentication and authorization.
 
+### Fixed
+
+- Initialize HTTP clients with CA trust before starting workers to prevent TLS
+  configuration races, CA updates require a restart ([#76](https://github.com/OpenCHAMI/power-control/issues/76)).
+
 ## [2.12.2] - 2026-10-08
 
 ### Fixed
