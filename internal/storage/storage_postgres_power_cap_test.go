@@ -173,8 +173,9 @@ func (s *StorageTestSuite) TestPowerCapTaskDelete() {
 	err = s.sp.DeletePowerCapTask(task.TaskID)
 	s.Require().NoError(err)
 
-	_, err = s.sp.GetPowerCapTask(task.TaskID)
-	s.Require().Error(err)
+	deleted, err := s.sp.GetPowerCapTask(task.TaskID)
+	s.Require().NoError(err)
+	s.Require().Nil(deleted)
 }
 
 // TestPowerCapTaskDelete tests deleting a single power cap operation.
@@ -197,8 +198,9 @@ func (s *StorageTestSuite) TestPowerCapOperationDelete() {
 	err = s.sp.DeletePowerCapOperation(task.TaskID, op.OperationID)
 	s.Require().NoError(err)
 
-	_, err = s.sp.GetPowerCapOperation(task.TaskID, op.OperationID)
-	s.Require().Error(err)
+	deleted, err := s.sp.GetPowerCapOperation(task.TaskID, op.OperationID)
+	s.Require().NoError(err)
+	s.Require().Nil(deleted)
 }
 
 // TestPowerCapMultiple tests inserting, retrieving, and deleting multiple associated resources.
@@ -256,8 +258,9 @@ func (s *StorageTestSuite) TestPowerCapMultiple() {
 	err = s.sp.DeletePowerCapTask(taskA.TaskID)
 	s.Require().NoError(err)
 
-	_, err = s.sp.GetPowerCapTask(taskA.TaskID)
-	s.Require().Error(err)
+	deleted, err := s.sp.GetPowerCapTask(taskA.TaskID)
+	s.Require().NoError(err)
+	s.Require().Nil(deleted)
 	remainingOpsA, err := s.sp.GetAllPowerCapOperationsForTask(taskA.TaskID)
 	s.Require().NoError(err)
 	s.Require().Empty(remainingOpsA)

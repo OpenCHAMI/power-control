@@ -102,19 +102,19 @@ func (e *ETCDStorage) kvStore(key string, val interface{}) error {
 	return err
 }
 
-func (e *ETCDStorage) kvGet(key string, val interface{}) error {
+func (e *ETCDStorage) kvGet(key string, val interface{}) (bool, error) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	realKey := e.fixUpKey(key)
 	v, exists, err := e.kvHandle.Get(realKey)
-	if exists {
-		// We have a key, so val is valid.
-		err = json.Unmarshal([]byte(v), &val)
-	} else if err == nil {
-		// No key and no error.  We will return this condition as an error
-		err = fmt.Errorf("Key %s does not exist", key)
+	if err != nil || !exists {
+		return false, err
 	}
-	return err
+	if err := json.Unmarshal([]byte(v), val); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (e *ETCDStorage) sortTransitionPages(list []hmetcd.Kvi_KV) {
@@ -226,15 +226,19 @@ func (e *ETCDStorage) Ping() error {
 	return err
 }
 
-func (e *ETCDStorage) GetPowerStatusMaster() (time.Time, error) {
+func (e *ETCDStorage) GetPowerStatusMaster() (*time.Time, error) {
 	var lastUpdated time.Time
 	key := fmt.Sprintf("%s", keySegPowerStatusMaster)
 
-	err := e.kvGet(key, &lastUpdated)
+	exists, err := e.kvGet(key, &lastUpdated)
 	if err != nil {
 		e.Logger.Error(err)
 	}
-	return lastUpdated, err
+	if err != nil || !exists {
+		return nil, err
+	}
+
+	return &lastUpdated, nil
 }
 
 func (e *ETCDStorage) StorePowerStatusMaster(now time.Time) error {
@@ -279,18 +283,22 @@ func (e *ETCDStorage) DeletePowerStatus(xname string) error {
 	return err
 }
 
-func (e *ETCDStorage) GetPowerStatus(xname string) (model.PowerStatusComponent, error) {
+func (e *ETCDStorage) GetPowerStatus(xname string) (*model.PowerStatusComponent, error) {
 	var pcomp model.PowerStatusComponent
 	if !(xnametypes.IsHMSCompIDValid(xname)) {
-		return pcomp, fmt.Errorf("Error parsing '%s': invalid xname format.", xname)
+		return nil, fmt.Errorf("Error parsing '%s': invalid xname format.", xname)
 	}
 	key := fmt.Sprintf("%s/%s", keySegPowerState, xname)
 
-	err := e.kvGet(key, &pcomp)
+	exists, err := e.kvGet(key, &pcomp)
 	if err != nil {
 		e.Logger.Error(err)
 	}
-	return pcomp, err
+	if err != nil || !exists {
+		return nil, err
+	}
+
+	return &pcomp, nil
 }
 
 func (e *ETCDStorage) GetAllPowerStatus() (model.PowerStatus, error) {
@@ -361,26 +369,33 @@ func (e *ETCDStorage) StorePowerCapOperation(op model.PowerCapOperation) error {
 	return err
 }
 
-func (e *ETCDStorage) GetPowerCapTask(taskID uuid.UUID) (model.PowerCapTask, error) {
+func (e *ETCDStorage) GetPowerCapTask(taskID uuid.UUID) (*model.PowerCapTask, error) {
 	var task model.PowerCapTask
 	key := fmt.Sprintf("%s/%s", keySegPowerCap, taskID.String())
 
-	err := e.kvGet(key, &task)
+	exists, err := e.kvGet(key, &task)
 	if err != nil {
 		e.Logger.Error(err)
 	}
-	return task, err
+	if err != nil || !exists {
+		return nil, err
+	}
+
+	return &task, nil
 }
 
-func (e *ETCDStorage) GetPowerCapOperation(taskID, opID uuid.UUID) (model.PowerCapOperation, error) {
+func (e *ETCDStorage) GetPowerCapOperation(taskID, opID uuid.UUID) (*model.PowerCapOperation, error) {
 	var op model.PowerCapOperation
 	key := fmt.Sprintf("%s/%s/%s", keySegPowerCapOp, taskID.String(), opID.String())
 
-	err := e.kvGet(key, &op)
+	exists, err := e.kvGet(key, &op)
 	if err != nil {
 		e.Logger.Error(err)
 	}
-	return op, err
+	if err != nil || !exists {
+		return nil, err
+	}
+	return &op, nil
 }
 
 func (e *ETCDStorage) GetAllPowerCapOperationsForTask(taskID uuid.UUID) ([]model.PowerCapOperation, error) {
@@ -742,32 +757,31 @@ func (e *ETCDStorage) StoreTransitionTask(task model.TransitionTask) error {
 	return err
 }
 
-func (e *ETCDStorage) GetTransition(transitionID uuid.UUID) (transition model.Transition, transitionFirstPage model.Transition, err error) {
+func (e *ETCDStorage) GetTransition(transitionID uuid.UUID) (*model.Transition, *model.Transition, error) {
 	key := fmt.Sprintf("%s/%s", keySegTransition, transitionID.String())
-
-	err = e.kvGet(key, &transition)
+	var transition model.Transition
+	exists, err := e.kvGet(key, &transition)
 	if err != nil {
 		e.Logger.Error(err)
-		return transition, transition, err
+		return nil, nil, err
 	}
-
+	if !exists {
+		return nil, nil, nil
+	}
+	transitionFirstPage := model.CopyTransition(transition)
 	if !e.DisableSizeChecks {
 		pages, err := e.GetTransitionPages(transition.TransitionID.String())
 		if err != nil {
 			e.Logger.Error(err)
+			return nil, nil, err
 		}
-		if len(pages) > 0 {
-			transitionFirstPage = model.CopyTransition(transition)
-			for _, page := range pages {
-				transition.Tasks = append(transition.Tasks, page.Tasks...)
-				transition.Location = append(transition.Location, page.Location...)
-				transition.TaskIDs = append(transition.TaskIDs, page.TaskIDs...)
-			}
-			return transition, transitionFirstPage, err
+		for _, page := range pages {
+			transition.Tasks = append(transition.Tasks, page.Tasks...)
+			transition.Location = append(transition.Location, page.Location...)
+			transition.TaskIDs = append(transition.TaskIDs, page.TaskIDs...)
 		}
 	}
-
-	return transition, transition, err
+	return &transition, &transitionFirstPage, nil
 }
 
 func (e *ETCDStorage) GetTransitionPages(transitionId string) ([]model.TransitionPage, error) {
@@ -797,15 +811,19 @@ func (e *ETCDStorage) GetTransitionPages(transitionId string) ([]model.Transitio
 	return pages, combinedErr
 }
 
-func (e *ETCDStorage) GetTransitionTask(transitionID, taskID uuid.UUID) (model.TransitionTask, error) {
+func (e *ETCDStorage) GetTransitionTask(transitionID, taskID uuid.UUID) (*model.TransitionTask, error) {
 	var task model.TransitionTask
 	key := fmt.Sprintf("%s/%s/%s", keySegTransitionTask, transitionID.String(), taskID.String())
 
-	err := e.kvGet(key, &task)
+	exists, err := e.kvGet(key, &task)
 	if err != nil {
 		e.Logger.Error(err)
 	}
-	return task, err
+	if err != nil || !exists {
+		return nil, err
+	}
+
+	return &task, nil
 }
 
 func (e *ETCDStorage) GetAllTasksForTransition(transitionID uuid.UUID) ([]model.TransitionTask, error) {
