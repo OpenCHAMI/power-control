@@ -25,7 +25,6 @@
 package domain
 
 import (
-	"sync"
 	"time"
 
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
@@ -44,23 +43,20 @@ func Init(glob *DOMAIN_GLOBALS) {
 }
 
 type DOMAIN_GLOBALS struct {
-	CAUri            string
-	BaseTRSTask      *trs_http_api.HttpTask
-	RFTloc           trs_http_api.TrsAPI
-	HSMTloc          trs_http_api.TrsAPI
-	RFClientLock     *sync.RWMutex
-	Running          *bool
-	DSP              storage.StorageProvider
-	HSM              hsm.HSMProvider
-	RFHttpClient     *hms_certs.HTTPClientPair
-	SVCHttpClient    *hms_certs.HTTPClientPair
-	RFTransportReady *bool
-	VaultEnabled     bool
-	CS               credstore.CredStoreProvider
-	DistLock         storage.DistributedLockProvider
-	MaxNumCompleted  int
-	ExpireTimeMins   int
-	PodName          string
+	BaseTRSTask     *trs_http_api.HttpTask
+	RFTloc          trs_http_api.TrsAPI
+	HSMTloc         trs_http_api.TrsAPI
+	Running         *bool
+	DSP             storage.StorageProvider
+	HSM             hsm.HSMProvider
+	RFHttpClient    *hms_certs.HTTPClientPair
+	SVCHttpClient   *hms_certs.HTTPClientPair
+	VaultEnabled    bool
+	CS              credstore.CredStoreProvider
+	DistLock        storage.DistributedLockProvider
+	MaxNumCompleted int
+	ExpireTimeMins  int
+	PodName         string
 }
 
 func (g *DOMAIN_GLOBALS) NewGlobals(base *trs_http_api.HttpTask,
@@ -68,7 +64,6 @@ func (g *DOMAIN_GLOBALS) NewGlobals(base *trs_http_api.HttpTask,
 	tlocSVC trs_http_api.TrsAPI,
 	clientRF *hms_certs.HTTPClientPair,
 	clientSVC *hms_certs.HTTPClientPair,
-	rfClientLock *sync.RWMutex,
 	running *bool, dsp storage.StorageProvider,
 	hsm hsm.HSMProvider, vaultEnabled bool,
 	credStore credstore.CredStoreProvider,
@@ -80,7 +75,6 @@ func (g *DOMAIN_GLOBALS) NewGlobals(base *trs_http_api.HttpTask,
 	g.HSMTloc = tlocSVC
 	g.RFHttpClient = clientRF
 	g.SVCHttpClient = clientSVC
-	g.RFClientLock = rfClientLock
 	g.Running = running
 	g.DSP = dsp
 	g.HSM = hsm
