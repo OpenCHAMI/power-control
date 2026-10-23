@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add optional Tokensmith authentication and authorization.
+- Add Tokensmith service tokens for outbound SMD requests.
 
 ## [2.12.2] - 2026-10-08
 
