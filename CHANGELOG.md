@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add optional Tokensmith authentication and authorization.
 
+### Fixed
+
+- Preserve cached power metadata when SMD refreshes fail or return invalid responses.
+
 ## [2.12.2] - 2026-10-08
 
 ### Fixed
