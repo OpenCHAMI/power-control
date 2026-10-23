@@ -24,7 +24,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lestrrat-go/jwx/v3 v3.3.0
 	github.com/lib/pq v1.12.3
-	github.com/moby/moby/api v1.55.0
+	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.5.0
 	github.com/openchami/chi-middleware/auth v0.0.0-20240812224658-b16b83c70700
 	github.com/openchami/chi-middleware/log v0.0.0-20240812224658-b16b83c70700
