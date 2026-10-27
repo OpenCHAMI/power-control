@@ -83,11 +83,12 @@ func containerEndpoint(t *testing.T, ctr testcontainers.Container, port string) 
 // IntegrationTestSuite owns shared services; each test starts its own PCS instance.
 type IntegrationTestSuite struct {
 	suite.Suite
-	network     string
-	pcsImage    string
-	keycloakURL string
-	smdURL      string
-	tokensmith  testcontainers.Container
+	network          string
+	pcsImage         string
+	keycloakURL      string
+	smdURL           string
+	smdTokenSmithURL string
+	tokensmith       testcontainers.Container
 }
 
 func TestIntegrationSuite(t *testing.T) {
@@ -166,11 +167,12 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	require.NoError(t, err)
 	require.Equal(t, 0, state.ExitCode, "SMD migrations failed")
 
-	s.smdURL = s.startSMD("smd", true)
-	s.startSMD("smd-open", false)
+	s.smdURL = s.startSMD("smd", internalJWKS)
+	s.startSMD("smd-open", "")
 
 	s.addSMDComponent("x0c0s0b0n0")
 	s.startTokenSmith()
+	s.smdTokenSmithURL = s.startSMD("smd-tokensmith", tokenSmithIssuer+"/.well-known/jwks.json")
 }
 
 func smdEnv() map[string]string {
@@ -189,12 +191,12 @@ func smdEnv() map[string]string {
 	}
 }
 
-func (s *IntegrationTestSuite) startSMD(alias string, auth bool) string {
+func (s *IntegrationTestSuite) startSMD(alias, jwksURL string) string {
 	t := s.T()
 	t.Helper()
 	env := smdEnv()
-	if auth {
-		env["SMD_JWKS_URL"] = internalJWKS
+	if jwksURL != "" {
+		env["SMD_JWKS_URL"] = jwksURL
 	}
 
 	ctr := newContainer(t, testcontainers.ContainerRequest{

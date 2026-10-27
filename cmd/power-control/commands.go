@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/openchami/power-control/v2/internal/auth"
 	"github.com/openchami/power-control/v2/internal/storage"
 )
 
@@ -48,7 +49,7 @@ func createPostgresInitCommand(postgres *storage.PostgresConfig, schema *schemaC
 }
 
 // createRootCommand creates the root command power-control command
-func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2 *oauth2Config) *cobra.Command {
+func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2 *auth.OAuth2Config) *cobra.Command {
 	// root command to run PCS and parent the Postgres initialization command
 	rootCommand := &cobra.Command{
 		Use:   "power-control",
@@ -64,12 +65,12 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 			}
 
 			// Validate OAuth2 configuration - either all or nothing
-			if oauth2 != nil {
+			if pcs.smdAuthProvider == authProviderOAuth2 && oauth2 != nil {
 				oauth2Provided := []bool{
-					oauth2.clientID != "",
-					oauth2.clientSecret != "",
-					oauth2.tokenURL != "",
-					len(oauth2.scopes) > 0,
+					oauth2.ClientID != "",
+					oauth2.ClientSecret != "",
+					oauth2.TokenURL != "",
+					len(oauth2.Scopes) > 0,
 				}
 
 				// All
@@ -89,7 +90,8 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			// If OAuth2 config is empty, set to nil
-			if oauth2 != nil && oauth2.clientID == "" {
+			if oauth2 != nil && oauth2.ClientID == "" && oauth2.ClientSecret == "" &&
+				oauth2.TokenURL == "" && len(oauth2.Scopes) == 0 {
 				oauth2 = nil
 			}
 
@@ -127,11 +129,15 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 	rootCommand.Flags().StringVar(&pcs.tokensmith.PolicyPath, "tokensmith-authz-policy-path", "", "Casbin policy file or directory (required in enforce and shadow modes)")
 	rootCommand.Flags().StringVar(&pcs.tokensmith.GroupingPath, "tokensmith-authz-grouping-path", "", "Optional Casbin role grouping file or directory")
 
+	// Outbound SMD authentication flags
+	rootCommand.Flags().StringVar(&pcs.smdAuthProvider, "smd-auth-provider", authProviderOAuth2, "Outbound SMD authentication provider: oauth2 or tokensmith")
+	rootCommand.Flags().StringVar(&pcs.tokensmithClient.URL, "smd-tokensmith-url", "", "TokenSmith base URL for outbound service tokens")
+	rootCommand.Flags().StringVar(&pcs.tokensmithClient.CAFile, "smd-tokensmith-ca-file", "", "Additional CA certificates for the outbound TokenSmith connection")
 	// OAuth2 flags
-	rootCommand.Flags().StringVar(&oauth2.clientID, "oauth2-client-id", "", "OAuth2 client ID")
-	rootCommand.Flags().StringVar(&oauth2.clientSecret, "oauth2-client-secret", "", "OAuth2 client secret")
-	rootCommand.Flags().StringVar(&oauth2.tokenURL, "oauth2-token-url", "", "OAuth2 token endpoint URL")
-	rootCommand.Flags().StringSliceVar(&oauth2.scopes, "oauth2-scopes", []string{}, "OAuth2 scopes (comma-separated)")
+	rootCommand.Flags().StringVar(&oauth2.ClientID, "oauth2-client-id", "", "OAuth2 client ID")
+	rootCommand.Flags().StringVar(&oauth2.ClientSecret, "oauth2-client-secret", "", "OAuth2 client secret")
+	rootCommand.Flags().StringVar(&oauth2.TokenURL, "oauth2-token-url", "", "OAuth2 token endpoint URL")
+	rootCommand.Flags().StringSliceVar(&oauth2.Scopes, "oauth2-scopes", []string{}, "OAuth2 scopes (comma-separated)")
 
 	// Postgres flags
 	rootCommand.PersistentFlags().StringVarP(&postgres.Host, "postgres-host", "", postgres.Host, "Postgres host as IP address or name")
