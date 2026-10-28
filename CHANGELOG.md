@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add optional Tokensmith authentication and authorization.
 - Add Tokensmith service tokens for outbound SMD requests.
 
+### Fixed
+
+- Allow power transitions to proceed when HSM locking is disabled.
+
 ## [2.12.2] - 2026-10-08
 
 ### Fixed

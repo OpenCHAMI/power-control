@@ -179,6 +179,9 @@ func (b *HSMv2) ReserveComponents(compList []ReservationData) ([]*ReservationDat
 	var resKeys []reservation.Reservation
 
 	if !b.HSMGlobals.LockEnabled {
+		for i := range compList {
+			retData = append(retData, &compList[i])
+		}
 		return retData, nil
 	}
 	if len(compList) == 0 {

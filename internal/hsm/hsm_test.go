@@ -174,6 +174,29 @@ func doHTTP(url string, method string, pld []byte) ([]byte, int, error) {
 	return rdata, rsp.StatusCode, nil
 }
 
+func TestReserveComponentsLockDisabled(t *testing.T) {
+	components := []ReservationData{
+		{XName: "x0c0s0b0n0"},
+		{XName: "x0c0s0b0n1"},
+	}
+	client := &HSMv2{HSMGlobals: HSM_GLOBALS{LockEnabled: false}}
+	got, err := client.ReserveComponents(components)
+	if err != nil {
+		t.Fatalf("ReserveComponents() error: %v", err)
+	}
+	if len(got) != len(components) {
+		t.Fatalf("ReserveComponents() returned %d components, want %d", len(got), len(components))
+	}
+	for i, comp := range components {
+		if got[i] != &components[i] {
+			t.Errorf("component %d: expected a pointer to the original input component", i)
+		}
+		if comp.ReservationOwner || comp.ReservationKey != "" || comp.DeputyKey != "" || comp.Error != nil {
+			t.Errorf("component %s: disabled locking should not acquire a reservation or set an error: %+v", comp.XName, comp)
+		}
+	}
+}
+
 func (suite *Models_TS) TestReserveComponents() {
 	t := suite.T()
 	var keyList []ReservationData
