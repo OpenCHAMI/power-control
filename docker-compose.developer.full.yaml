@@ -1,5 +1,5 @@
-#THIS environment sets up all of PCS except for the main PCS binary..
-#  All dependencies -> HSM (vault, hm-collector, kafka), RTS (red fish sims) are all setup and active.
+# This environment sets up PCS, HSM, and the Redfish simulators.
+#  All dependencies -> HSM (vault), RTS (red fish sims) are all setup and active.
 #  The ports are exposed to the local system.
 networks:
   pcs:
@@ -100,7 +100,6 @@ services:
       - SMD_DBPASS=${POSTGRES_PASSWORD:-postgres}
       - SMD_DBOPTS=sslmode=disable
       - SMD_JWKS_URL=
-      - RF_MSG_HOST=kafka:9092:cray-dmtf-resource-event
       - CRAY_VAULT_AUTH_PATH=auth/token/create
       - CRAY_VAULT_ROLE_FILE=configs/namespace
       - CRAY_VAULT_JWT_FILE=configs/token
@@ -121,51 +120,6 @@ services:
       - vault
     ports:
       - "27779:27779"
-    networks:
-      - pcs
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.9.10
-    hostname: zookeeper
-    ports:
-      - "2181:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    networks:
-      - pcs
-  kafka:
-    image: confluentinc/cp-kafka:8.4.0
-    hostname: kafka
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-    networks:
-      - pcs
-  cray-hms-hmcollector:
-    image: hms-hmcollector # For now we use a local image
-    environment:
-      - LOG_LEVEL=TRACE
-      - SM_URL=http://smd:27779
-      - POLLING_ENABLED=false
-      - RF_SUBSCRIBE_ENABLED=false
-      - REST_PORT=80
-      - VAULT_TOKEN=hms
-      - CRAY_VAULT_JWT_FILE=configs/token
-      - CRAY_VAULT_ROLE_FILE=configs/namespace
-      - CRAY_VAULT_AUTH_PATH=auth/token/create
-      - VAULT_ADDR=http://vault:8200
-    volumes:
-      - ./configs/kafka_brokers.json:/configs/kafka_brokers.json
-      - ./configs/namespace:/configs/namespace
-      - ./configs/token:/configs/token
     networks:
       - pcs
 
