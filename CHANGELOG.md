@@ -8,14 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-10-29
+
 ### Added
 
-- Add optional Tokensmith authentication and authorization.
-- Add Tokensmith service tokens for outbound SMD requests.
+- Add optional Tokensmith authentication and role-based authorization, with
+  enforce, shadow, and off authorization modes and bundled access policies.
+- Add Tokensmith service tokens for outbound SMD requests, with bootstrap-token
+  or mTLS service identity authentication and automatic token refresh.
+
+### Changed
+
+- Remove unused Kafka, ZooKeeper, and hardware collector services from the
+  developer Compose environments.
+- Update Go module, container image, and CI tool dependencies.
 
 ### Fixed
 
 - Allow power transitions to proceed when HSM locking is disabled.
+- Distinguish missing storage records from backend failures, preserving 404
+  responses and stopping workers safely when records are missing.
+- Preserve tasks, locations, and task IDs in transition snapshots, and propagate
+  etcd lookup and transition page-read errors.
+- Preserve message length, object size, and size-check settings when the
+  in-memory backend delegates to etcd storage logic.
+
+### Security
+
+- Fail startup when a configured JWKS endpoint cannot supply verification keys,
+  instead of continuing with authentication disabled.
 
 ## [2.12.2] - 2026-10-08
 
