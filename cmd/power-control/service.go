@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
 
 	"github.com/openchami/power-control/v2/internal/api"
 	"github.com/openchami/power-control/v2/internal/auth"
@@ -69,10 +71,13 @@ var (
 const (
 	authProviderJWKS       = "jwks"
 	authProviderTokenSmith = "tokensmith"
+	authProviderOAuth2     = "oauth2"
 )
 
 // pcsConfig holds the configuration for the Power Control Service (PCS).
 type pcsConfig struct {
+	smdAuthProvider    string
+	tokensmithClient   auth.TokensmithClientConfig
 	authProvider       string
 	jwksURL            string
 	tokensmith         auth.TokensmithConfig
@@ -101,16 +106,8 @@ type fakeVault struct {
 	Password string
 }
 
-// oauth2Config holds the OAuth2 configuration for SMD communication.
-type oauth2Config struct {
-	tokenURL     string
-	clientID     string
-	clientSecret string
-	scopes       []string
-}
-
 // runPCS runs the Power Control Service (PCS).
-func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2Config *oauth2Config) error {
+func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2Config *auth.OAuth2Config) error {
 	var authentication auth.Auth
 	var err error
 	switch pcs.authProvider {
@@ -129,6 +126,30 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		return err
 	}
 	router := api.NewRouter(authentication)
+
+	var smdTokenSource oauth2.TokenSource
+	switch pcs.smdAuthProvider {
+	case authProviderOAuth2:
+		if pcs.tokensmithClient.URL != "" || pcs.tokensmithClient.CAFile != "" {
+			logger.Log.Warn("Ignoring outbound TokenSmith settings because smd-auth-provider is oauth2")
+		}
+		if oauth2Config != nil {
+			smdTokenSource = auth.NewOAuth2TokenSource(ctx, *oauth2Config)
+		}
+	case authProviderTokenSmith:
+		if oauth2Config != nil {
+			logger.Log.Warn("Ignoring OAuth2 settings because smd-auth-provider is tokensmith")
+		}
+		if strings.HasPrefix(pcs.tokensmithClient.URL, "http://") {
+			logger.Log.Warn("Outbound TokenSmith uses HTTP: bootstrap and refresh tokens will be sent without TLS")
+		}
+		smdTokenSource, err = auth.NewTokenSmithTokenSource(ctx, pcs.tokensmithClient)
+	default:
+		return fmt.Errorf("invalid smd-auth-provider %q: use oauth2 or tokensmith", pcs.smdAuthProvider)
+	}
+	if err != nil {
+		return err
+	}
 
 	serviceName, err := base.GetServiceInstanceName()
 	if err != nil {
@@ -244,7 +265,10 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 
 	TLOC_rf.Init(serviceName, trsLogger)
 	TLOC_svc.Init(serviceName, trsLogger)
-	rfClient, smdClient, err := initHTTPClients(ctx, caURI, TLOC_rf, oauth2Config)
+	if smdTokenSource != nil {
+		logger.Log.Infof("Configuring SMD client with %s", pcs.smdAuthProvider)
+	}
+	rfClient, smdClient, err := initHTTPClients(caURI, TLOC_rf, smdTokenSource)
 	if err != nil {
 		return err
 	}

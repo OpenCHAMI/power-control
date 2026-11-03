@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -10,14 +9,11 @@ import (
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/clientcredentials"
-
-	"github.com/openchami/power-control/v2/internal/logger"
 )
 
 // initHTTPClients loads trust once, before clients are shared with workers or
 // reservations. Certificate changes require a restart.
-func initHTTPClients(ctx context.Context, caURI string, rfTloc trsapi.TrsAPI, config *oauth2Config) (*hms_certs.HTTPClientPair, *hms_certs.HTTPClientPair, error) {
+func initHTTPClients(caURI string, rfTloc trsapi.TrsAPI, tokenSource oauth2.TokenSource) (*hms_certs.HTTPClientPair, *hms_certs.HTTPClientPair, error) {
 	var roots *x509.CertPool
 	if caURI != "" {
 		chain, err := hms_certs.FetchCAChain(caURI)
@@ -45,19 +41,11 @@ func initHTTPClients(ctx context.Context, caURI string, rfTloc trsapi.TrsAPI, co
 	if err != nil {
 		return nil, nil, fmt.Errorf("create SMD HTTP client: %w", err)
 	}
-	if config != nil {
-		logger.Log.Info("Configuring SMD client with OAuth2")
-		clientConfig := &clientcredentials.Config{
-			ClientID:     config.clientID,
-			ClientSecret: config.clientSecret,
-			TokenURL:     config.tokenURL,
-			Scopes:       config.scopes,
-			AuthStyle:    oauth2.AuthStyleInHeader,
-		}
+	if tokenSource != nil {
 		// Both SMD pair entries use the same client; wrap its transport once.
 		client := smdClient.SecureClient.HTTPClient
 		client.Transport = &oauth2.Transport{
-			Source: clientConfig.TokenSource(ctx),
+			Source: tokenSource,
 			Base:   client.Transport,
 		}
 	}

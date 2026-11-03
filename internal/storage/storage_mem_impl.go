@@ -49,7 +49,15 @@ type MEMStorage struct {
 }
 
 func toETCDStorage(m *MEMStorage) *ETCDStorage {
-	return &ETCDStorage{Logger: m.Logger, PageSize: m.PageSize, mutex: m.mutex, kvHandle: m.kvHandle}
+	return &ETCDStorage{
+		Logger:            m.Logger,
+		DisableSizeChecks: m.DisableSizeChecks,
+		PageSize:          m.PageSize,
+		MaxMessageLen:     m.MaxMessageLen,
+		MaxEtcdObjectSize: m.MaxEtcdObjectSize,
+		mutex:             m.mutex,
+		kvHandle:          m.kvHandle,
+	}
 }
 
 func (m *MEMStorage) Init(Logger *logrus.Logger) error {

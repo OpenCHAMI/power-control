@@ -27,6 +27,7 @@ package main
 import (
 	"os"
 
+	"github.com/openchami/power-control/v2/internal/auth"
 	"github.com/openchami/power-control/v2/internal/logger"
 	"github.com/openchami/power-control/v2/internal/storage"
 )
@@ -40,7 +41,7 @@ func main() {
 	postgres := storage.DefaultPostgresConfig()
 	var etcd etcdConfig
 	var schema schemaConfig
-	var oauth2 oauth2Config
+	var oauth2 auth.OAuth2Config
 
 	logger.Init()
 

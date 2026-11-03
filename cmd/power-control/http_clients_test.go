@@ -22,9 +22,12 @@ import (
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	reservation "github.com/openchami/smd/v2/pkg/service-reservations"
+	"github.com/openchami/tokensmith/pkg/tokenservice"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 
+	"github.com/openchami/power-control/v2/internal/auth"
 	"github.com/openchami/power-control/v2/internal/hsm"
 	"github.com/openchami/power-control/v2/internal/logger"
 )
@@ -55,10 +58,10 @@ func writeTestCABundle(t *testing.T, chain string) string {
 	return path
 }
 
-func newTestHTTPClients(t *testing.T, caURI string, config *oauth2Config) (*hms_certs.HTTPClientPair, *hms_certs.HTTPClientPair, *trsapi.TRSHTTPLocal) {
+func newTestHTTPClients(t *testing.T, caURI string, tokenSource oauth2.TokenSource) (*hms_certs.HTTPClientPair, *hms_certs.HTTPClientPair, *trsapi.TRSHTTPLocal) {
 	t.Helper()
 	tloc := &trsapi.TRSHTTPLocal{Logger: logrus.New()}
-	rfClient, smdClient, err := initHTTPClients(context.Background(), caURI, tloc, config)
+	rfClient, smdClient, err := initHTTPClients(caURI, tloc, tokenSource)
 	require.NoError(t, err)
 	t.Cleanup(rfClient.CloseIdleConnections)
 	t.Cleanup(smdClient.CloseIdleConnections)
@@ -155,7 +158,7 @@ func TestHTTPClientsRejectInvalidCA(t *testing.T) {
 				require.NoError(t, os.WriteFile(path, []byte(tc.contents), 0600))
 			}
 			tloc := &trsapi.TRSHTTPLocal{Logger: logrus.New()}
-			rfClient, smdClient, err := initHTTPClients(context.Background(), path, tloc, nil)
+			rfClient, smdClient, err := initHTTPClients(path, tloc, nil)
 			require.ErrorContains(t, err, "PCS_CA_URI")
 			require.Nil(t, rfClient)
 			require.Nil(t, smdClient)
@@ -168,17 +171,20 @@ func TestPCSRejectsInvalidCAAtStartup(t *testing.T) {
 	t.Setenv("PCS_JWKS_URL", "")
 	t.Setenv("TRS_IMPLEMENTATION", "LOCAL")
 	t.Setenv("PCS_CA_URI", filepath.Join(t.TempDir(), "missing.pem"))
-	err := runPCS(context.Background(), &pcsConfig{authProvider: authProviderJWKS}, nil, nil, nil)
+	err := runPCS(context.Background(), &pcsConfig{authProvider: authProviderJWKS, smdAuthProvider: authProviderOAuth2}, nil, nil, nil)
 	require.ErrorContains(t, err, "PCS_CA_URI")
 }
 
 func TestHTTPClientsSMDAuthentication(t *testing.T) {
 	logger.Init()
+	t.Setenv(tokenservice.ServiceIdentityCertEnvVar, "")
+	t.Setenv(tokenservice.ServiceIdentityKeyEnvVar, "")
+	t.Setenv(tokenservice.BootstrapTokenEnvVar, "bootstrap")
 	var tokenRequests atomic.Int32
 	tokens := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenRequests.Add(1)
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"access_token":"test-token","token_type":"Bearer","expires_in":3600}`)
+		io.WriteString(w, `{"access_token":"test-token","token_type":"Bearer","expires_in":3600,"refresh_token":"refresh","refresh_expires_in":86400}`)
 	}))
 	defer tokens.Close()
 	var smdRequests atomic.Int32
@@ -195,16 +201,26 @@ func TestHTTPClientsSMDAuthentication(t *testing.T) {
 	path := writeTestCABundle(t, string(caPEM))
 
 	testCases := []struct {
-		name, caURI string
+		name, caURI, provider string
 	}{
-		{"verified TLS", path},
-		{"legacy TLS", ""},
+		{"OAuth2 verified TLS", path, authProviderOAuth2},
+		{"OAuth2 legacy TLS", "", authProviderOAuth2},
+		{"TokenSmith verified TLS", path, authProviderTokenSmith},
+		{"TokenSmith legacy TLS", "", authProviderTokenSmith},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, smdClient, _ := newTestHTTPClients(t, tc.caURI, &oauth2Config{
-				tokenURL: tokens.URL, clientID: "pcs", clientSecret: "secret",
-			})
+			var source oauth2.TokenSource
+			if tc.provider == authProviderTokenSmith {
+				var err error
+				source, err = auth.NewTokenSmithTokenSource(context.Background(), auth.TokensmithClientConfig{URL: tokens.URL})
+				require.NoError(t, err)
+			} else {
+				source = auth.NewOAuth2TokenSource(context.Background(), auth.OAuth2Config{
+					TokenURL: tokens.URL, ClientID: "pcs", ClientSecret: "secret",
+				})
+			}
+			_, smdClient, _ := newTestHTTPClients(t, tc.caURI, source)
 			h := &hsm.HSMv2{}
 			require.NoError(t, h.Init(&hsm.HSM_GLOBALS{
 				SvcName: "test", Logger: logrus.New(), LockEnabled: true,
@@ -221,6 +237,6 @@ func TestHTTPClientsSMDAuthentication(t *testing.T) {
 			})
 		})
 	}
-	require.EqualValues(t, 4, smdRequests.Load())
-	require.EqualValues(t, 2, tokenRequests.Load(), "each client should reuse its token")
+	require.EqualValues(t, 8, smdRequests.Load())
+	require.EqualValues(t, 4, tokenRequests.Load(), "each client should reuse its token")
 }
