@@ -95,9 +95,7 @@ func (tloc *TRSHTTPLocal) Init(serviceName string, logger *logrus.Logger) error 
 //
 // Return:   Nil on success; error string on failure
 
-func (tloc *TRSHTTPLocal) SetSecurity(inParams interface{}) error {
-	params := inParams.(TRSHTTPLocalSecurity)
-
+func (tloc *TRSHTTPLocal) SetSecurity(params TRSHTTPLocalSecurity) error {
 	if params.CACertBundleData == "" {
 		err := fmt.Errorf("CA cert bundle required.")
 		tloc.Logger.Errorf("SetSecurity(): %v", err)
