@@ -34,7 +34,6 @@ import (
 	"time"
 
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
-	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/Cray-HPE/hms-xname/xnametypes"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
@@ -44,6 +43,7 @@ import (
 	"github.com/openchami/power-control/v2/internal/logger"
 	"github.com/openchami/power-control/v2/internal/model"
 	"github.com/openchami/power-control/v2/internal/storage"
+	"github.com/openchami/power-control/v2/internal/taskrun"
 )
 
 type Transitions_TS struct {
@@ -57,7 +57,7 @@ func (ts *Transitions_TS) SetupSuite() {
 	var (
 		Running           bool = true
 		svcClient         *hms_certs.HTTPClientPair
-		TLOC_rf, TLOC_svc trsapi.TrsAPI
+		TLOC_rf, TLOC_svc taskrun.TrsAPI
 		serviceName       string = "PCS-domain-transitions-test"
 		DSP               storage.StorageProvider
 		DLOCK             storage.DistributedLockProvider
@@ -65,7 +65,7 @@ func (ts *Transitions_TS) SetupSuite() {
 		// StateManagerServer string
 		credStoreGlob credstore.CREDSTORE_GLOBALS
 		CS            credstore.CredStoreProvider
-		BaseTRSTask   trsapi.HttpTask
+		BaseTRSTask   taskrun.HttpTask
 		domainGlobals DOMAIN_GLOBALS
 	)
 
@@ -96,9 +96,9 @@ func (ts *Transitions_TS) SetupSuite() {
 	BaseTRSTask.Request.Header.Set("Content-Type", "application/json")
 	BaseTRSTask.Request.Header.Add("HMS-Service", BaseTRSTask.ServiceName)
 
-	workerSec := &trsapi.TRSHTTPLocal{}
+	workerSec := &taskrun.TRSHTTPLocal{}
 	workerSec.Logger = logger.Log
-	workerInsec := &trsapi.TRSHTTPLocal{}
+	workerInsec := &taskrun.TRSHTTPLocal{}
 	workerInsec.Logger = logger.Log
 	TLOC_rf = workerSec
 	TLOC_svc = workerInsec

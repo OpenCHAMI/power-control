@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
-	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	reservation "github.com/openchami/smd/v2/pkg/service-reservations"
 	"github.com/openchami/tokensmith/pkg/tokenservice"
 	"github.com/sirupsen/logrus"
@@ -30,6 +29,7 @@ import (
 	"github.com/openchami/power-control/v2/internal/auth"
 	"github.com/openchami/power-control/v2/internal/hsm"
 	"github.com/openchami/power-control/v2/internal/logger"
+	"github.com/openchami/power-control/v2/internal/taskrun"
 )
 
 // Each server has its own certificate, so trusting one cannot trust the other.
@@ -58,9 +58,9 @@ func writeTestCABundle(t *testing.T, chain string) string {
 	return path
 }
 
-func newTestHTTPClients(t *testing.T, caURI string, tokenSource oauth2.TokenSource) (*hms_certs.HTTPClientPair, *hms_certs.HTTPClientPair, *trsapi.TRSHTTPLocal) {
+func newTestHTTPClients(t *testing.T, caURI string, tokenSource oauth2.TokenSource) (*hms_certs.HTTPClientPair, *hms_certs.HTTPClientPair, *taskrun.TRSHTTPLocal) {
 	t.Helper()
-	tloc := &trsapi.TRSHTTPLocal{Logger: logrus.New()}
+	tloc := &taskrun.TRSHTTPLocal{Logger: logrus.New()}
 	rfClient, smdClient, err := initHTTPClients(caURI, tloc, tokenSource)
 	require.NoError(t, err)
 	t.Cleanup(rfClient.CloseIdleConnections)
@@ -157,7 +157,7 @@ func TestHTTPClientsRejectInvalidCA(t *testing.T) {
 			if tc.name != "missing" {
 				require.NoError(t, os.WriteFile(path, []byte(tc.contents), 0600))
 			}
-			tloc := &trsapi.TRSHTTPLocal{Logger: logrus.New()}
+			tloc := &taskrun.TRSHTTPLocal{Logger: logrus.New()}
 			rfClient, smdClient, err := initHTTPClients(path, tloc, nil)
 			require.ErrorContains(t, err, "PCS_CA_URI")
 			require.Nil(t, rfClient)

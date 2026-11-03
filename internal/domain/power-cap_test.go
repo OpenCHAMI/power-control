@@ -36,12 +36,12 @@ import (
 	"time"
 
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
-	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 
 	"github.com/openchami/power-control/v2/internal/hsm"
 	"github.com/openchami/power-control/v2/internal/logger"
 	"github.com/openchami/power-control/v2/internal/model"
 	"github.com/openchami/power-control/v2/internal/storage"
+	"github.com/openchami/power-control/v2/internal/taskrun"
 )
 
 var RFServerUrl string
@@ -218,13 +218,13 @@ func doSetup() error {
 		err                error
 		Running            bool = true
 		svcClient          *hms_certs.HTTPClientPair
-		TLOC_rf, TLOC_svc  trsapi.TrsAPI
+		TLOC_rf, TLOC_svc  taskrun.TrsAPI
 		serviceName        string = "PCS-domain-power-cap-test"
 		DSP                storage.StorageProvider
 		HSM                hsm.HSMProvider
 		VaultEnabled       bool = false
 		StateManagerServer string
-		BaseTRSTask        trsapi.HttpTask
+		BaseTRSTask        taskrun.HttpTask
 		domainGlobals      DOMAIN_GLOBALS
 	)
 
@@ -249,9 +249,9 @@ func doSetup() error {
 	BaseTRSTask.Request.Header.Set("Content-Type", "application/json")
 	BaseTRSTask.Request.Header.Add("HMS-Service", BaseTRSTask.ServiceName)
 
-	workerSec := &trsapi.TRSHTTPLocal{}
+	workerSec := &taskrun.TRSHTTPLocal{}
 	workerSec.Logger = logger.Log
-	workerInsec := &trsapi.TRSHTTPLocal{}
+	workerInsec := &taskrun.TRSHTTPLocal{}
 	workerInsec.Logger = logger.Log
 	TLOC_rf = workerSec
 	TLOC_svc = workerInsec

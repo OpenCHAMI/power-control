@@ -28,12 +28,12 @@ import (
 	"time"
 
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
-	"github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 
 	"github.com/openchami/power-control/v2/internal/credstore"
 	"github.com/openchami/power-control/v2/internal/hsm"
 	"github.com/openchami/power-control/v2/internal/logger"
 	"github.com/openchami/power-control/v2/internal/storage"
+	"github.com/openchami/power-control/v2/internal/taskrun"
 )
 
 var GLOB *DOMAIN_GLOBALS
@@ -43,9 +43,9 @@ func Init(glob *DOMAIN_GLOBALS) {
 }
 
 type DOMAIN_GLOBALS struct {
-	BaseTRSTask     *trs_http_api.HttpTask
-	RFTloc          trs_http_api.TrsAPI
-	HSMTloc         trs_http_api.TrsAPI
+	BaseTRSTask     *taskrun.HttpTask
+	RFTloc          taskrun.TrsAPI
+	HSMTloc         taskrun.TrsAPI
 	Running         *bool
 	DSP             storage.StorageProvider
 	HSM             hsm.HSMProvider
@@ -59,9 +59,9 @@ type DOMAIN_GLOBALS struct {
 	PodName         string
 }
 
-func (g *DOMAIN_GLOBALS) NewGlobals(base *trs_http_api.HttpTask,
-	tlocRF trs_http_api.TrsAPI,
-	tlocSVC trs_http_api.TrsAPI,
+func (g *DOMAIN_GLOBALS) NewGlobals(base *taskrun.HttpTask,
+	tlocRF taskrun.TrsAPI,
+	tlocSVC taskrun.TrsAPI,
 	clientRF *hms_certs.HTTPClientPair,
 	clientSVC *hms_certs.HTTPClientPair,
 	running *bool, dsp storage.StorageProvider,
