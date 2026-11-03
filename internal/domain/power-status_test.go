@@ -31,7 +31,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -112,7 +111,7 @@ func glbInit() {
 		DLOCK = tdLock
 		DLOCK.Init(tlogger)
 
-		domGlb.NewGlobals(nil, TLOC_rf, nil, nil, svcClient, &sync.RWMutex{},
+		domGlb.NewGlobals(nil, TLOC_rf, nil, nil, svcClient,
 			&running, DSP, HSM, vaultEnabled, CS, DLOCK, 20000, 1440,
 			"power-status_test-pod")
 
