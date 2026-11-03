@@ -501,7 +501,7 @@ func ExecuteTask(tloc *TRSHTTPLocal, tct taskChannelTuple) {
 	// First validate our task
 	if ok, err := tct.task.Validate(); !ok {
 		tloc.Logger.Errorf("Failed validation of request: %+v, err: %s", tct.task, err)
-		tct.task.Err = &err
+		tct.task.Err = err
 		tct.taskListChannel <- tct.task
 		return
 	}
@@ -536,7 +536,7 @@ func ExecuteTask(tloc *TRSHTTPLocal, tct taskChannelTuple) {
 	req, err := retryablehttp.FromRequest(tct.task.Request)
 	if err != nil {
 		tloc.Logger.Errorf("Failed wrapping request with retryablehttp: %v", err)
-		tct.task.Err = &err
+		tct.task.Err = err
 		tct.taskListChannel <- tct.task
 		return
 	}
@@ -565,9 +565,9 @@ func ExecuteTask(tloc *TRSHTTPLocal, tct taskChannelTuple) {
 		}
 	}
 
-	tct.task.Err = &tmpError
-	if (*tct.task.Err) != nil {
-		tloc.Logger.Tracef("Request failed: %s", (*tct.task.Err).Error())
+	tct.task.Err = tmpError
+	if tct.task.Err != nil {
+		tloc.Logger.Tracef("Request failed: %s", tct.task.Err.Error())
 	}
 	if tct.task.Request.Response != nil {
 		tloc.Logger.Tracef("Response: %d", tct.task.Request.Response.StatusCode)

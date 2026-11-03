@@ -733,8 +733,8 @@ func doPowerCapTask(taskID uuid.UUID) {
 			op := trsTaskMap[tdone.GetID()]
 			for i := 0; i < 1; i++ {
 
-				if *tdone.Err != nil {
-					taskErr = *tdone.Err
+				if tdone.Err != nil {
+					taskErr = tdone.Err
 
 					// Must always drain and close response bodies even if we don't use them
 					base.DrainAndCloseResponseBody(tdone.Request.Response)

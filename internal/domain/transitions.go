@@ -821,8 +821,8 @@ func doTransition(transitionID uuid.UUID) {
 				comp := trsTaskMap[tdone.GetID()]
 				for i := 0; i < 1; i++ {
 
-					if *tdone.Err != nil {
-						taskErr = *tdone.Err
+					if tdone.Err != nil {
+						taskErr = tdone.Err
 
 						base.DrainAndCloseResponseBody(tdone.Request.Response)
 

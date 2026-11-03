@@ -167,8 +167,8 @@ func testLaunch(t *testing.T, numTasks int, testSecure bool, useBadCert bool, ti
 				t.Errorf("Launch chan returned bad status: %v", tdone.Request.Response.StatusCode)
 				nErr++
 			}
-			if tdone.Err != nil && *tdone.Err != nil {
-				t.Errorf("Launch chan returned error: %v", *tdone.Err)
+			if tdone.Err != nil {
+				t.Errorf("Launch chan returned error: %v", tdone.Err)
 			}
 		}
 		if nDone == len(tList) {
