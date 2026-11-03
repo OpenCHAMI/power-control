@@ -424,11 +424,18 @@ func (b *HSMv2) FillComponentEndpointData(hd map[string]*HsmData) error {
 				smurl, bderr)
 		}
 
+		if rsp.StatusCode != http.StatusOK {
+			return fmt.Errorf("Error in http request '%s': unexpected status code %d", smurl, rsp.StatusCode)
+		}
+
 		var jdata sm.ComponentEndpointArray
 		bderr = json.Unmarshal(body, &jdata)
 		if bderr != nil {
 			return fmt.Errorf("Error unmarshalling response body for '%s': %v",
 				smurl, bderr)
+		}
+		if jdata.ComponentEndpoints == nil {
+			return fmt.Errorf("Invalid response body for '%s': ComponentEndpoints must be an array", smurl)
 		}
 
 		//Update the data from HSM into the HSM data map
@@ -624,10 +631,17 @@ func (b *HSMv2) GetStateComponents(xnames []string) (base.ComponentArray, error)
 			smurl, bderr)
 	}
 
+	if rsp.StatusCode != http.StatusOK {
+		return retData, fmt.Errorf("Error in http request '%s': unexpected status code %d", smurl, rsp.StatusCode)
+	}
+
 	bderr = json.Unmarshal(body, &retData)
 	if bderr != nil {
 		return retData, fmt.Errorf("Error unmarshalling response body for '%s': %v",
 			smurl, bderr)
+	}
+	if retData.Components == nil {
+		return retData, fmt.Errorf("Invalid response body for '%s': Components must be an array", smurl)
 	}
 
 	return retData, nil

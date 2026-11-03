@@ -30,6 +30,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -39,6 +40,7 @@ import (
 	trsapi "github.com/Cray-HPE/hms-trs-app-api/v3/pkg/trs_http_api"
 	"github.com/Cray-HPE/hms-xname/xnametypes"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/openchami/power-control/v2/internal/credstore"
@@ -502,4 +504,152 @@ func (suite *PwrStat_TS) Test_PowerStatusMonitor() {
 func Test_PowerStatusStuff(t *testing.T) {
 	glbInit()
 	suite.Run(t, new(PwrStat_TS))
+}
+
+const refreshStatePath = "/hsm/v2/State/Components/Query"
+const refreshEndpointPath = "/hsm/v2/Inventory/ComponentEndpoints"
+const refreshComponents = `{"Components":[{"ID":"x0c0s0b0n0","Type":"Node","State":"Ready"},{"ID":"x0c0s1b0n0","Type":"Node","State":"Ready"}]}`
+
+type refreshTransport func(*http.Request) (*http.Response, error)
+
+func (f refreshTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func successfulRefreshBody(t *testing.T, req *http.Request) string {
+	t.Helper()
+	if req.URL.Path == refreshStatePath {
+		require.Equal(t, http.MethodPost, req.Method)
+		return refreshComponents
+	}
+	require.Equal(t, refreshEndpointPath, req.URL.Path)
+	require.Equal(t, http.MethodGet, req.Method)
+	var endpoints []string
+	for _, id := range req.URL.Query()["id"] {
+		endpoints = append(endpoints, fmt.Sprintf(`{"ID":%q,"ComponentEndpointType":"ComponentEndpointComputerSystem","RedfishEndpointFQDN":"new-bmc","OdataID":"/redfish/v1/Systems/1"}`, id))
+	}
+	return `{"ComponentEndpoints":[` + strings.Join(endpoints, ",") + `]}`
+}
+
+func setupComponentRefresh(t *testing.T, transport refreshTransport) *hsm.HSMv2 {
+	t.Helper()
+	previousHSM, previousMap, previousStore, previousLogger := hsmHandle, hwStateMap, kvStore, glogger
+	t.Cleanup(func() {
+		hsmHandle, hwStateMap, kvStore, glogger = previousHSM, previousMap, previousStore, previousLogger
+	})
+	glogger = logrus.New()
+	store := &storage.MEMStorage{}
+	require.NoError(t, store.Init(glogger))
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	kvStore = store
+	hwStateMap = make(map[string]*componentPowerInfo)
+	for _, id := range []string{"x0c0s0b0n0", "x0c0s1b0n0"} {
+		info := &componentPowerInfo{
+			PSComp:  pcsmodel.PowerStatusComponent{XName: id, PowerState: "on"},
+			HSMData: hsm.HsmData{RfFQDN: "previous-bmc", PowerStatusURI: "/previous/status", PowerActionURI: "/previous/reset"},
+		}
+		hwStateMap[id] = info
+		require.NoError(t, store.StorePowerStatus(info.PSComp))
+	}
+	client, err := hms_certs.CreateRetryableHTTPClientPair("", 1, 0, 1)
+	require.NoError(t, err)
+	client.SecureClient.HTTPClient.Transport = transport
+	t.Cleanup(client.CloseIdleConnections)
+	handle := &hsm.HSMv2{}
+	require.NoError(t, handle.Init(&hsm.HSM_GLOBALS{SMUrl: "http://smd", SVCHttpClient: client, Logger: glogger}))
+	hsmHandle = handle
+	return handle
+}
+
+func TestUpdateComponentMapPreservesSnapshotOnFailure(t *testing.T) {
+	testCases := []struct {
+		name       string
+		path       string
+		status     int
+		body       string
+		laterBatch bool
+	}{
+		{name: "state unauthorized with components", path: refreshStatePath, status: http.StatusUnauthorized, body: refreshComponents},
+		{name: "state partial content", path: refreshStatePath, status: http.StatusPartialContent, body: refreshComponents},
+		{name: "state missing components", path: refreshStatePath, status: http.StatusOK, body: `{}`},
+		{name: "state null response", path: refreshStatePath, status: http.StatusOK, body: `null`},
+		{name: "state null components", path: refreshStatePath, status: http.StatusOK, body: `{"Components":null}`},
+		{name: "endpoint unauthorized", path: refreshEndpointPath, status: http.StatusUnauthorized, body: `{"error":"unauthorized"}`},
+		{name: "endpoint partial content", path: refreshEndpointPath, status: http.StatusPartialContent, body: `{"ComponentEndpoints":[]}`},
+		{name: "endpoint unavailable", path: refreshEndpointPath, status: http.StatusServiceUnavailable, body: `{}`},
+		{name: "endpoint missing inventory", path: refreshEndpointPath, status: http.StatusOK, body: `{}`},
+		{name: "endpoint null response", path: refreshEndpointPath, status: http.StatusOK, body: `null`},
+		{name: "endpoint null inventory", path: refreshEndpointPath, status: http.StatusOK, body: `{"ComponentEndpoints":null}`},
+		{name: "endpoint truncated inventory", path: refreshEndpointPath, status: http.StatusOK, body: `{"ComponentEndpoints":[`},
+		{name: "later batch failure", path: refreshEndpointPath, status: http.StatusOK, body: `{}`, laterBatch: true},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			endpointCalls := 0
+			handle := setupComponentRefresh(t, func(req *http.Request) (*http.Response, error) {
+				status, body := http.StatusOK, successfulRefreshBody(t, req)
+				if req.URL.Path == refreshEndpointPath {
+					endpointCalls++
+				}
+				if req.URL.Path == testCase.path && (!testCase.laterBatch || endpointCalls == 2) {
+					status, body = testCase.status, testCase.body
+				}
+				return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(body))}, nil
+			})
+			if testCase.laterBatch {
+				handle.HSMGlobals.MaxComponentQuery = 1
+			}
+			before := make(map[string]componentPowerInfo)
+			for id, info := range hwStateMap {
+				before[id] = *info
+			}
+
+			require.Error(t, updateComponentMap())
+			require.Len(t, hwStateMap, len(before))
+			for id, info := range before {
+				require.Equal(t, &info, hwStateMap[id])
+				stored, err := kvStore.GetPowerStatus(id)
+				require.NoError(t, err)
+				require.Equal(t, &info.PSComp, stored)
+			}
+		})
+	}
+}
+
+func TestUpdateComponentMapSuccessfulRefresh(t *testing.T) {
+	requests := 0
+	emptyEndpoints := false
+	emptyComponents := false
+	handle := setupComponentRefresh(t, func(req *http.Request) (*http.Response, error) {
+		requests++
+		body := successfulRefreshBody(t, req)
+		if emptyEndpoints && req.URL.Path == refreshEndpointPath {
+			body = `{"ComponentEndpoints":[]}`
+		}
+		if emptyComponents && req.URL.Path == refreshStatePath {
+			body = `{"Components":[]}`
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})
+
+	require.NoError(t, updateComponentMap())
+	require.Len(t, hwStateMap, 2)
+	for _, info := range hwStateMap {
+		require.Equal(t, "new-bmc", info.HSMData.RfFQDN)
+		require.Equal(t, "/redfish/v1/Systems/1", info.HSMData.PowerStatusURI)
+		require.Equal(t, "on", info.PSComp.PowerState)
+	}
+	require.Equal(t, 2, requests, "refresh should use one state query and one bulk endpoint request")
+
+	emptyEndpoints = true
+	data, err := handle.FillHSMData([]string{"all"})
+	require.NoError(t, err, "valid empty endpoint arrays must remain supported")
+	require.Len(t, data, 2)
+	require.Equal(t, 4, requests)
+
+	emptyComponents = true
+	data, err = handle.FillHSMData([]string{"all"})
+	require.NoError(t, err, "valid empty component arrays must remain supported")
+	require.Empty(t, data)
+	require.Equal(t, 5, requests, "empty component lists should not query endpoints")
 }
