@@ -42,10 +42,10 @@ type TrsAPI interface {
 	Init(serviceName string, logger *logrus.Logger) error
 	SetSecurity(params TRSHTTPLocalSecurity) error
 	CreateTaskList(source *HttpTask, numTasks int) []HttpTask
-	Launch(taskList *[]HttpTask) (chan *HttpTask, error)
-	Check(taskList *[]HttpTask) (running bool, err error)
-	Cancel(taskList *[]HttpTask)
-	Close(taskList *[]HttpTask)
+	Launch(taskList []HttpTask) (chan *HttpTask, error)
+	Check(taskList []HttpTask) (running bool, err error)
+	Cancel(taskList []HttpTask)
+	Close(taskList []HttpTask)
 	Alive() (ok bool, err error)
 	Cleanup()
 }

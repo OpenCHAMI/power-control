@@ -571,7 +571,7 @@ func getHWStatesFromHW() error {
 
 	if activeTasks == 0 {
 		glogger.Warnf("%s: No TRS tasks to launch", fname)
-		tloc.Close(&taskList)
+		tloc.Close(taskList)
 		return nil
 	}
 
@@ -581,7 +581,7 @@ func getHWStatesFromHW() error {
 		"(timeout %v) (%s)",
 		fname, activeTasks, taskIX, statusTimeout, GLOB.PodName)
 
-	rchan, err := tloc.Launch(&taskList)
+	rchan, err := tloc.Launch(taskList)
 	if err != nil {
 		return fmt.Errorf("%s: TRS Launch() error: %v.", fname, err)
 	}
@@ -655,7 +655,7 @@ func getHWStatesFromHW() error {
 			break
 		}
 	}
-	tloc.Close(&taskList)
+	tloc.Close(taskList)
 	close(rchan)
 
 	glogger.Infof("%s: Processing BMC status responses (%s)", fname, GLOB.PodName)

@@ -90,7 +90,7 @@ func (tloc *TRSHTTPLocal) Init(serviceName string, logger *logrus.Logger) error 
 // target system. The CA cert bundle is required.  The client cert/key data
 // is optional.
 //
-// inParams: Pointer to a TRSHTTPLocalSecurity struct containing the CA cert
+// params:   TRSHTTPLocalSecurity struct containing the CA cert
 //           bundle and optional client cert/key data.
 //
 // Return:   Nil on success; error string on failure
@@ -595,47 +595,47 @@ func ExecuteTask(tloc *TRSHTTPLocal, tct taskChannelTuple) {
 //		  completion.
 // error: Nil on success; error string on failure
 
-func (tloc *TRSHTTPLocal) Launch(taskList *[]HttpTask) (chan *HttpTask, error) {
-	if len(*taskList) == 0 {
+func (tloc *TRSHTTPLocal) Launch(taskList []HttpTask) (chan *HttpTask, error) {
+	if len(taskList) == 0 {
 		rchan := make(chan *HttpTask, 1)
 		err := fmt.Errorf("Empty task list, nothing to do.")
 		return rchan, err
 	}
 
 	//Set all time stamps
-	taskListChannel := make(chan *HttpTask, len(*taskList))
+	taskListChannel := make(chan *HttpTask, len(taskList))
 
-	for ii := 0; ii < len(*taskList); ii++ {
-		if (*taskList)[ii].Ignore == true {
+	for ii := 0; ii < len(taskList); ii++ {
+		if taskList[ii].Ignore == true {
 			continue
 		}
 
 		//Always set the response to nil; make sure its clean.
 		//Add user-agent header.
-		if (*taskList)[ii].Request != nil {
-			(*taskList)[ii].Request.Response = nil
-			base.SetHTTPUserAgent((*taskList)[ii].Request, tloc.svcName)
+		if taskList[ii].Request != nil {
+			taskList[ii].Request.Response = nil
+			base.SetHTTPUserAgent(taskList[ii].Request, tloc.svcName)
 		}
 		//make sure the id is set
-		(*taskList)[ii].SetIDIfNotPopulated()
+		taskList[ii].SetIDIfNotPopulated()
 
 		//make sure the service name is set
-		if (*taskList)[ii].ServiceName == "" {
-			(*taskList)[ii].ServiceName = tloc.svcName
+		if taskList[ii].ServiceName == "" {
+			taskList[ii].ServiceName = tloc.svcName
 		}
 
 		//make sure the timestamp is set
-		if (*taskList)[ii].TimeStamp == "" {
-			(*taskList)[ii].TimeStamp = time.Now().Format(time.RFC3339Nano)
+		if taskList[ii].TimeStamp == "" {
+			taskList[ii].TimeStamp = time.Now().Format(time.RFC3339Nano)
 		}
 
 		//Setup the channel stuff
 		tct := taskChannelTuple{
 			taskListChannel: taskListChannel,
-			task:            &(*taskList)[ii],
+			task:            &taskList[ii],
 		}
 		tloc.taskMutex.Lock()
-		tloc.taskMap[(*taskList)[ii].id] = &tct
+		tloc.taskMap[taskList[ii].id] = &tct
 		tloc.taskMutex.Unlock()
 
 		// pass the Tloc (so it can find a client) + the task channel tuple (so it knows what to do);
@@ -658,9 +658,9 @@ func (tloc *TRSHTTPLocal) Launch(taskList *[]HttpTask) (chan *HttpTask, error) {
 // bool:  True or false if the task list is still running
 // error: Nil on success; error string on failure
 
-func (tloc *TRSHTTPLocal) Check(taskList *[]HttpTask) (bool, error) {
+func (tloc *TRSHTTPLocal) Check(taskList []HttpTask) (bool, error) {
 	if taskList != nil {
-		for _, v := range *taskList {
+		for _, v := range taskList {
 			if v.Ignore == false {
 				if v.Request.Response == nil && v.Err == nil {
 					return true, nil
@@ -693,9 +693,9 @@ func (tloc *TRSHTTPLocal) Alive() (bool, error) {
 //
 // taskList:  Pointer to the task list to cancel
 
-func (tloc *TRSHTTPLocal) Cancel(taskList *[]HttpTask) {
+func (tloc *TRSHTTPLocal) Cancel(taskList []HttpTask) {
 	if taskList != nil {
-		for _, v := range *taskList {
+		for _, v := range taskList {
 			if v.Ignore == false {
 				v.contextCancel()
 			}
@@ -709,9 +709,9 @@ func (tloc *TRSHTTPLocal) Cancel(taskList *[]HttpTask) {
 //
 // taskList:  Pointer to the task list to close
 
-func (tloc *TRSHTTPLocal) Close(taskList *[]HttpTask) {
+func (tloc *TRSHTTPLocal) Close(taskList []HttpTask) {
 	if taskList != nil {
-		for _, v := range *taskList {
+		for _, v := range taskList {
 			if v.Ignore == false {
 				// The caller should have closed the response body, but we'll also
 				// do it here to prevent resource leaks.  Note that if that was

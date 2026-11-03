@@ -811,7 +811,7 @@ func doTransition(transitionID uuid.UUID) {
 				len(compList), GLOB.BaseTRSTask.Timeout,
 				GLOB.PodName)
 
-			rchan, err := GLOB.RFTloc.Launch(&trsTaskList)
+			rchan, err := GLOB.RFTloc.Launch(trsTaskList)
 			if err != nil {
 				logrus.Error(err)
 			}
@@ -878,13 +878,13 @@ func doTransition(transitionID uuid.UUID) {
 					logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing transition task")
 				}
 			}
-			GLOB.RFTloc.Close(&trsTaskList)
+			GLOB.RFTloc.Close(trsTaskList)
 			close(rchan)
 			logger.Log.Infof("%s: Done processing BMC responses (%s)",
 				fname, GLOB.PodName)
 		} else {
 			// Free up this memory
-			GLOB.RFTloc.Close(&trsTaskList)
+			GLOB.RFTloc.Close(trsTaskList)
 		}
 
 		// TRS section for getting power state for confirmation.
