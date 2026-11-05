@@ -147,7 +147,7 @@ func testLaunch(t *testing.T, numTasks int, testSecure bool, useBadCert bool, ti
 	tproto := HttpTask{Request: req, Timeout: timeout * time.Second}
 	tList := tloc.CreateTaskList(&tproto, numTasks)
 
-	tch, err := tloc.Launch(&tList)
+	tch, err := tloc.Launch(tList)
 	if err != nil {
 		t.Errorf("Launch() failed: %v", err)
 	}
@@ -167,8 +167,8 @@ func testLaunch(t *testing.T, numTasks int, testSecure bool, useBadCert bool, ti
 				t.Errorf("Launch chan returned bad status: %v", tdone.Request.Response.StatusCode)
 				nErr++
 			}
-			if tdone.Err != nil && *tdone.Err != nil {
-				t.Errorf("Launch chan returned error: %v", *tdone.Err)
+			if tdone.Err != nil {
+				t.Errorf("Launch chan returned error: %v", tdone.Err)
 			}
 		}
 		if nDone == len(tList) {
@@ -200,7 +200,7 @@ func TestLaunchTimeout(t *testing.T) {
 	tList := tloc.CreateTaskList(&tproto, 1)
 	stallCancel = make(chan bool, 1)
 
-	tch, err := tloc.Launch(&tList)
+	tch, err := tloc.Launch(tList)
 	if err != nil {
 		t.Errorf("Launch() failed: %v", err)
 	}

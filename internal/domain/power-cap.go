@@ -722,7 +722,7 @@ func doPowerCapTask(taskID uuid.UUID) {
 			"(timeout %v) (%s)", fname, trsTaskIdx, len(goodOps),
 			GLOB.BaseTRSTask.Timeout, GLOB.PodName)
 
-		rchan, err := GLOB.RFTloc.Launch(&trsTaskList)
+		rchan, err := GLOB.RFTloc.Launch(trsTaskList)
 		if err != nil {
 			logrus.Error(err)
 		}
@@ -733,8 +733,8 @@ func doPowerCapTask(taskID uuid.UUID) {
 			op := trsTaskMap[tdone.GetID()]
 			for i := 0; i < 1; i++ {
 
-				if *tdone.Err != nil {
-					taskErr = *tdone.Err
+				if tdone.Err != nil {
+					taskErr = tdone.Err
 
 					// Must always drain and close response bodies even if we don't use them
 					base.DrainAndCloseResponseBody(tdone.Request.Response)
@@ -808,7 +808,7 @@ func doPowerCapTask(taskID uuid.UUID) {
 				logger.Log.WithFields(logrus.Fields{"ERROR": err}).Error("Error storing power capping operation")
 			}
 		}
-		GLOB.RFTloc.Close(&trsTaskList)
+		GLOB.RFTloc.Close(trsTaskList)
 		close(rchan)
 		logger.Log.Infof("%s: Done processing BMC responses (%s)",
 			fname, GLOB.PodName)

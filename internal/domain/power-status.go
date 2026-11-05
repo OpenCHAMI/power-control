@@ -452,7 +452,7 @@ func getStatusCode(tp *taskrun.HttpTask) int {
 		ecode = int(tp.Request.Response.StatusCode)
 	} else {
 		if tp.Err != nil {
-			glogger.Tracef("getStatusCode, no response, err: '%v'", *tp.Err)
+			glogger.Tracef("getStatusCode, no response, err: '%v'", tp.Err)
 			ecode = int(http.StatusInternalServerError)
 		} else {
 			ecode = int(http.StatusNoContent)
@@ -571,7 +571,7 @@ func getHWStatesFromHW() error {
 
 	if activeTasks == 0 {
 		glogger.Warnf("%s: No TRS tasks to launch", fname)
-		tloc.Close(&taskList)
+		tloc.Close(taskList)
 		return nil
 	}
 
@@ -581,7 +581,7 @@ func getHWStatesFromHW() error {
 		"(timeout %v) (%s)",
 		fname, activeTasks, taskIX, statusTimeout, GLOB.PodName)
 
-	rchan, err := tloc.Launch(&taskList)
+	rchan, err := tloc.Launch(taskList)
 	if err != nil {
 		return fmt.Errorf("%s: TRS Launch() error: %v.", fname, err)
 	}
@@ -640,7 +640,7 @@ func getHWStatesFromHW() error {
 			} else {
 				rspErr = nil
 				if task.Err != nil {
-					rspErr = *task.Err
+					rspErr = task.Err
 				}
 				glogger.Errorf("%s: ERROR no response body for '%s' '%s' "+
 					"'%s', err: %v (rchan status: %d/%d)",
@@ -655,7 +655,7 @@ func getHWStatesFromHW() error {
 			break
 		}
 	}
-	tloc.Close(&taskList)
+	tloc.Close(taskList)
 	close(rchan)
 
 	glogger.Infof("%s: Processing BMC status responses (%s)", fname, GLOB.PodName)
