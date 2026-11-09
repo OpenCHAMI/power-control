@@ -40,7 +40,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/etcd v0.45.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.45.0
 	golang.org/x/exp v0.0.0-20261106192419-47ce03d25ef0
-	golang.org/x/oauth2 v0.37.0
+	golang.org/x/oauth2 v0.38.0
 )
 
 require (
