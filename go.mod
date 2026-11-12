@@ -14,7 +14,7 @@ require (
 	github.com/Cray-HPE/hms-hmetcd v1.13.0
 	github.com/Cray-HPE/hms-securestorage v1.18.0
 	github.com/Cray-HPE/hms-xname v1.4.0
-	github.com/OpenCHAMI/jwtauth/v5 v5.0.0-20260729162818-d6b185bd9ebc
+	github.com/OpenCHAMI/jwtauth/v5 bd5511502332
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.20.1
