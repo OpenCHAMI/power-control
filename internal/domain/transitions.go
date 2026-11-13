@@ -782,7 +782,12 @@ func doTransition(transitionID uuid.UUID) {
 			comp.Task.Operation = powerActionOp
 			trsTaskMap[trsTaskList[trsTaskIdx].GetID()] = comp
 			trsTaskList[trsTaskIdx].CPolicy.Retry.Retries = 3
-			trsTaskList[trsTaskIdx].Request, _ = http.NewRequest("POST", "https://"+comp.HSMData.RfFQDN+comp.HSMData.PowerActionURI, bytes.NewBuffer([]byte(payload)))
+			method := "POST"
+			// JAWS Update uses the PATCH method
+			if isJawsURI(comp.HSMData.PowerActionURI) {
+				method = "PATCH"
+			}
+			trsTaskList[trsTaskIdx].Request, _ = http.NewRequest(method, "https://"+comp.HSMData.RfFQDN+comp.HSMData.PowerActionURI, bytes.NewBuffer([]byte(payload)))
 			trsTaskList[trsTaskIdx].Request.Header.Set("Content-Type", "application/json")
 			trsTaskList[trsTaskIdx].Request.Header.Add("HMS-Service", GLOB.BaseTRSTask.ServiceName)
 			// Vault enabled?
@@ -1583,6 +1588,10 @@ func generateTransitionPayload(comp *TransitionComponent, action string) (string
 			body = fmt.Sprintf(`{"OutletNumber":%s,"StartupState":"on","Outletname":"OUTLET%s","OnDelay":0,"OffDelay":0,"RebootDelay":5,"OutletStatus":"%s"}`, outlet[1], outlet[1], strings.ToLower(resetType))
 		} else {
 			body = fmt.Sprintf(`{"PowerState": "%s"}`, resetType)
+		}
+		// JAWS PDU
+		if isJawsURI(comp.HSMData.PowerActionURI) {
+			body = fmt.Sprintf(`{"control_action": "%s"}`, resetType)
 		}
 	} else {
 		body = fmt.Sprintf(`{"ResetType": "%s"}`, resetType)
