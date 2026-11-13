@@ -30,6 +30,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	base "github.com/Cray-HPE/hms-base/v2"
@@ -76,6 +78,12 @@ const (
 )
 
 var hwStateMap = make(map[string]*componentPowerInfo)
+
+// Guards hwStateMap and the PSComp fields of its entries.  The map was
+// historically only touched by the monitorHW() goroutine, but the JAWS PDU
+// monitor (JawsMonitor) now updates power states from its own goroutine via
+// updateHWState().
+var hwStateMapLock sync.RWMutex
 var glogger *logrus.Logger
 var hsmHandle pcshsm.HSMProvider
 var kvStore storage.StorageProvider
@@ -89,9 +97,9 @@ var serviceRunning *bool
 var vaultEnabled = false
 var statusTimeout = 30 // context timeout for an entire task list status request
 var httpRetries = 3
-var maxIdleConns = 4000     // maximum number of idle connections in the TRS pool
-var maxIdleConnsPerHost = 4 // maximum number of idle connections per host in the TRS pool
-var isPowerStatusMaster = false
+var maxIdleConns = 4000             // maximum number of idle connections in the TRS pool
+var maxIdleConnsPerHost = 4         // maximum number of idle connections per host in the TRS pool
+var isPowerStatusMaster atomic.Bool // written by monitorHW() and the keep-alive goroutine, read by JawsMonitor()
 var powerStatusMasterInterval = 15
 
 /////////////////////////////////////////////////////////////////////////////
@@ -324,6 +332,9 @@ func updateComponentMap() error {
 	//components are removed from HSM, we'll remove them from our internal
 	//map too, so we don't keep trying to contact BMCs that may not exist.
 
+	hwStateMapLock.Lock()
+	defer hwStateMapLock.Unlock()
+
 	for k := range hwStateMap {
 		_, ok := compMap[k]
 		if !ok {
@@ -400,11 +411,13 @@ func updateComponentMap() error {
 func updateVaultCreds() error {
 	tmpMap := make(map[string]*componentPowerInfo)
 
+	hwStateMapLock.RLock()
 	for k, v := range hwStateMap {
 		if v.BmcUsername == "" || v.BmcPassword != "" {
 			tmpMap[k] = v
 		}
 	}
+	hwStateMapLock.RUnlock()
 
 	err := getVaultCredsAll(tmpMap)
 	return err
@@ -515,6 +528,7 @@ func getHWStatesFromHW() error {
 	activeTasks := 0
 	taskIX := 0
 
+	hwStateMapLock.RLock()
 	for k, v := range hwStateMap { //key is component XName, val is HSM RF EP info
 		ctype := xnametypes.GetHMSType(k)
 		switch ctype {
@@ -543,6 +557,11 @@ func getHWStatesFromHW() error {
 				glogger.Warnf("%s: Missing FQDN or power status URI for %s", fname, k)
 				taskList[taskIX].Ignore = true
 				taskIX++
+				// PDU JAWS Device, handled in its own monitoring loop
+				// (only skipped when that loop is actually enabled)
+			} else if isJawsURI(v.HSMData.PowerStatusURI) && JawsMonitorEnabled() {
+				taskList[taskIX].Ignore = true
+				taskIX++
 			} else {
 				url = "https://" + v.HSMData.RfFQDN + v.HSMData.PowerStatusURI
 				taskList[taskIX].Request, _ = http.NewRequest(http.MethodGet, url, nil)
@@ -568,6 +587,7 @@ func getHWStatesFromHW() error {
 			taskIX++
 		}
 	}
+	hwStateMapLock.RUnlock()
 
 	if activeTasks == 0 {
 		glogger.Warnf("%s: No TRS tasks to launch", fname)
@@ -719,8 +739,10 @@ func getHWStatesFromHW() error {
 				pcsmodel.ManagementStateFilter_unavailable,
 				v.task.Request.Response.Status)
 			//Insure the next sweep gets new creds from Vault.
+			hwStateMapLock.RLock()
 			hwStateMap[xname].BmcUsername = ""
 			hwStateMap[xname].BmcPassword = ""
+			hwStateMapLock.RUnlock()
 
 		default:
 			if scode >= 206 {
@@ -867,11 +889,11 @@ func monitorHW() {
 
 		time.Sleep(pmSampleInterval)
 
-		if !isPowerStatusMaster {
-			isPowerStatusMaster = getPowerStatusMaster()
+		if !isPowerStatusMaster.Load() {
+			isPowerStatusMaster.Store(getPowerStatusMaster())
 		}
 
-		if !isPowerStatusMaster {
+		if !isPowerStatusMaster.Load() {
 			continue
 		}
 
@@ -902,11 +924,13 @@ func monitorHW() {
 		// the the status field may not be the property updated, but for now
 		// this is acceptable.
 		var updatedComponents []pcsmodel.PowerStatusComponent
+		hwStateMapLock.RLock()
 		for _, comp := range hwStateMap {
 			if comp.PSComp.LastUpdated.After(updated) {
 				updatedComponents = append(updatedComponents, comp.PSComp)
 			}
 		}
+		hwStateMapLock.RUnlock()
 
 		// Update SMD with new power states
 		if len(updatedComponents) > 0 {
@@ -928,8 +952,10 @@ func updateHWState(xname string, hwState pcsmodel.PowerStateFilter,
 	mgmtState pcsmodel.ManagementStateFilter, errInfo string) {
 	funcname := "updateHWState()"
 
+	hwStateMapLock.Lock()
 	comp, ok := hwStateMap[xname]
 	if !ok {
+		hwStateMapLock.Unlock()
 		//Something's wrong...
 		glogger.Errorf("%s: INTERNAL ERROR: no HW map entry for '%s'",
 			funcname, xname)
@@ -943,6 +969,7 @@ func updateHWState(xname string, hwState pcsmodel.PowerStateFilter,
 
 	if hwStateStr == strings.ToLower(comp.PSComp.PowerState) &&
 		mgmtStateStr == strings.ToLower(comp.PSComp.ManagementState) {
+		hwStateMapLock.Unlock()
 		return
 	}
 
@@ -962,6 +989,7 @@ func updateHWState(xname string, hwState pcsmodel.PowerStateFilter,
 	psc.Error = errInfo
 	psc.SupportedPowerTransitions = comp.PSComp.SupportedPowerTransitions
 	psc.LastUpdated = comp.PSComp.LastUpdated
+	hwStateMapLock.Unlock()
 
 	err := kvStore.StorePowerStatus(psc)
 	if err != nil {
@@ -1091,7 +1119,7 @@ func startPowerStatusMaster(lastUpdated time.Time) {
 		select {
 		case <-keepAlive.C:
 			if !pstateMonitorRunning || !(*serviceRunning) {
-				isPowerStatusMaster = false
+				isPowerStatusMaster.Store(false)
 				return
 			}
 			now := time.Now()
@@ -1103,7 +1131,7 @@ func startPowerStatusMaster(lastUpdated time.Time) {
 			if !success {
 				// Someone else became master
 				glogger.Infof("Lost power status master")
-				isPowerStatusMaster = false
+				isPowerStatusMaster.Store(false)
 				return
 			}
 			lastUpdated = now
