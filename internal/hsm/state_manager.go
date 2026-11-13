@@ -491,10 +491,20 @@ func (b *HSMv2) FillComponentEndpointData(hd map[string]*HsmData) error {
 				if comp.RedfishOutletInfo != nil {
 					outInfo, ok := comp.RedfishOutletInfo.(*rf.ComponentOutletInfo)
 					if !ok {
-						b.HSMGlobals.Logger.Warnf("Unexpected RedfishOutletInfo type for '%s': %T", comp.ID, comp.RedfishOutletInfo)
-						break
+						// RedfishOutletInfo is an any field, so JSON
+						// unmarshalling may leave it as a generic map.
+						rawInfo, err := json.Marshal(comp.RedfishOutletInfo)
+						if err != nil {
+							b.HSMGlobals.Logger.Warnf("Error marshalling RedfishOutletInfo for '%s': %v", comp.ID, err)
+							break
+						}
+						outInfo = new(rf.ComponentOutletInfo)
+						if err = json.Unmarshal(rawInfo, outInfo); err != nil {
+							b.HSMGlobals.Logger.Warnf("Error unmarshalling RedfishOutletInfo for '%s': %v", comp.ID, err)
+							break
+						}
 					}
-					if outInfo.Actions != nil {
+					if outInfo.Actions != nil && outInfo.Actions.PowerControl != nil {
 						hd[comp.ID].PowerActionURI = outInfo.Actions.PowerControl.Target
 						hd[comp.ID].AllowableActions = outInfo.Actions.PowerControl.AllowableValues
 					}

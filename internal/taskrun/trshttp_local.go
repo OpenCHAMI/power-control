@@ -365,6 +365,27 @@ func (c *trsRoundTripper) trsCheckRetry(ctx context.Context, resp *http.Response
 	return shouldRetry, defaultRPErr
 }
 
+// trsCipherSuites returns Go's default TLS cipher suites plus the legacy
+// RSA key-exchange suites that Go removed from its defaults in Go 1.22
+// (the GODEBUG=tlsrsakex opt-in was itself removed in Go 1.27).  Older PDU
+// firmware (e.g. ServerTech JAWS) only offers TLS_RSA_WITH_* suites, so
+// without these the TLS handshake fails.  The legacy suites are appended
+// after the defaults so endpoints that support forward-secret (ECDHE)
+// ciphers continue to negotiate them.  This mirrors jawsSuites() in
+// internal/domain/jaws.go.
+func trsCipherSuites() []uint16 {
+	var suites []uint16
+	for _, c := range tls.CipherSuites() {
+		suites = append(suites, c.ID)
+	}
+	return append(suites,
+		tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+		tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+		tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+		tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+	)
+}
+
 // Create and configure a new client transport for use with HTTP clients.
 func createClient(task *HttpTask, tloc *TRSHTTPLocal, clientType string) (client *retryablehttp.Client) {
 	// Configure the base transport
@@ -374,10 +395,12 @@ func createClient(task *HttpTask, tloc *TRSHTTPLocal, clientType string) (client
 	if clientType == "insecure" {
 		tr.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
+			CipherSuites:       trsCipherSuites(),
 		}
 	} else { // secure
 		tr.TLSClientConfig = &tls.Config{
-			RootCAs: tloc.CACertPool,
+			RootCAs:      tloc.CACertPool,
+			CipherSuites: trsCipherSuites(),
 		}
 		tr.TLSClientConfig.BuildNameToCertificate()
 	}
