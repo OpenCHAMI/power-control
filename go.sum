@@ -258,6 +258,7 @@ github.com/spf13/pflag v1.1.0 h1:6W6MbVUrnMb8PEhjkqwsVLY7ryuzRfFHF4mQd7L94ag=
 github.com/spf13/pflag v1.1.0/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
 github.com/stillya/testcontainers-keycloak v0.3.8 h1:TcGNR/FQ85PKSXPlllywWTW59z6rVk/hd7g+zj54Hdg=
 github.com/stillya/testcontainers-keycloak v0.3.8/go.mod h1:mT9MsQxmU6zMxYnR8z0OA8GRIURp6gkk6SjBJ11U8r0=
+github.com/stillya/testcontainers-keycloak v0.3.9/go.mod h1:Usz316LF5R6fXz4SOkpITKMuEF2dL7DSep4qQOcifI8=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.5.3 h1:jmXUvGomnU1o3W/V5h2VEradbpJDwGrzugQQvL0POH4=
 github.com/stretchr/objx v0.5.3/go.mod h1:rDQraq+vQZU7Fde9LOZLr8Tax6zZvy4kuNKF+QYS+U0=
