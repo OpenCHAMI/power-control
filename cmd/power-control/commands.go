@@ -112,6 +112,10 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 	rootCommand.Flags().IntVar(&pcs.maxNumCompleted, "max-num-completed", defaultMaxNumCompleted, "Maximum number of completed records to keep.")
 	rootCommand.Flags().IntVar(&pcs.expireTimeMins, "expire-time-mins", defaultExpireTimeMins, "The time, in mins, to keep completed records.")
 
+	rootCommand.Flags().BoolVar(&pcs.jawsMonitor, "jaws-monitor", false, "Enable JAWS PDU monitoring")
+	rootCommand.Flags().IntVar(&pcs.jawsMonitorInterval, "jaws-monitor-interval", 30, "Interval in seconds between JAWS PDU monitoring polls")
+	rootCommand.Flags().BoolVar(&pcs.jawsInsecureSkipVerify, "jaws-insecure-skip-verify", false, "Skip TLS certificate verification for JAWS PDUs")
+
 	// ETCD flags
 	rootCommand.Flags().BoolVar(&etcd.disableSizeChecks, "etcd-disable-size-checks", false, "Disables checking object size before storing and doing message truncation and paging.")
 	rootCommand.Flags().IntVar(&etcd.pageSize, "etcd-page-size", storage.DefaultEtcdPageSize, "The maximum number of records to put in each etcd entry.")
@@ -162,6 +166,15 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 
 // flagToEnvVarName converts a flag name to an environment variable name
 func flagToEnvVarName(flag string) string {
+	switch flag {
+	case "jaws-monitor":
+		return "PCS_JAWS_MONITOR"
+	case "jaws-monitor-interval":
+		return "PCS_JAWS_MONITOR_INTERVAL"
+	case "jaws-insecure-skip-verify":
+		return "PCS_JAWS_INSECURE_SKIP_VERIFY"
+	}
+
 	// TODO: It might be nice to have a standard prefix, but for now
 	// this would have a bit a ripple effect on existing code.
 	// envVarName := "PCS_" + flag
