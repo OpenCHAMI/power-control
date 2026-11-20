@@ -76,20 +76,23 @@ const (
 
 // pcsConfig holds the configuration for the Power Control Service (PCS).
 type pcsConfig struct {
-	smdAuthProvider    string
-	tokensmithClient   auth.TokensmithClientConfig
-	authProvider       string
-	jwksURL            string
-	tokensmith         auth.TokensmithConfig
-	fakeVaultEnabled   bool
-	vaultEnabled       bool
-	vaultKeypath       string
-	stateManagerServer string
-	hsmLockEnabled     bool
-	runControl         bool
-	credCacheDuration  int
-	maxNumCompleted    int
-	expireTimeMins     int
+	smdAuthProvider        string
+	tokensmithClient       auth.TokensmithClientConfig
+	authProvider           string
+	jwksURL                string
+	tokensmith             auth.TokensmithConfig
+	fakeVaultEnabled       bool
+	vaultEnabled           bool
+	vaultKeypath           string
+	stateManagerServer     string
+	hsmLockEnabled         bool
+	runControl             bool
+	credCacheDuration      int
+	maxNumCompleted        int
+	expireTimeMins         int
+	jawsMonitor            bool
+	jawsMonitorInterval    int
+	jawsInsecureSkipVerify bool
 }
 
 // etcdConfig holds the configuration for the ETCD storage (if that is used).
@@ -108,6 +111,13 @@ type fakeVault struct {
 
 // runPCS runs the Power Control Service (PCS).
 func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2Config *auth.OAuth2Config) error {
+	if err := os.Setenv("PCS_JAWS_MONITOR", strconv.FormatBool(pcs.jawsMonitor)); err != nil {
+		return fmt.Errorf("set PCS_JAWS_MONITOR: %w", err)
+	}
+	if err := os.Setenv("PCS_JAWS_INSECURE_SKIP_VERIFY", strconv.FormatBool(pcs.jawsInsecureSkipVerify)); err != nil {
+		return fmt.Errorf("set PCS_JAWS_INSECURE_SKIP_VERIFY: %w", err)
+	}
+
 	var authentication auth.Auth
 	var err error
 	switch pcs.authProvider {
@@ -471,6 +481,20 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		(time.Duration(dlockTimeout) * time.Second),
 		logger.Log, (time.Duration(pwrSampleInterval) * time.Second),
 		statusTimeout, statusHttpRetries, maxIdleConns, maxIdleConnsPerHost)
+
+	// Start up Monitoring of JAWS PDU devices
+	if domain.JawsMonitorEnabled() {
+		logger.Log.Infof("Monitoring JAWS devices.")
+		jawsMonitorInterval := pcs.jawsMonitorInterval
+		if jawsMonitorInterval <= 0 {
+			logger.Log.Errorf("Invalid value of PCS_JAWS_MONITOR_INTERVAL, defaulting to 30")
+			jawsMonitorInterval = 30
+		}
+		logger.Log.Infof("Using PCS_JAWS_MONITOR_INTERVAL: %v", jawsMonitorInterval)
+		go domain.JawsMonitor(jawsMonitorInterval)
+	} else {
+		logger.Log.Infof("JAWS Monitoring set to False")
+	}
 
 	domain.StartRecordsReaper()
 
