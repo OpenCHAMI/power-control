@@ -241,13 +241,25 @@ func (e *ETCDStorage) GetPowerStatusMaster() (*time.Time, error) {
 	return &lastUpdated, nil
 }
 
-func (e *ETCDStorage) StorePowerStatusMaster(now time.Time) error {
-	key := fmt.Sprintf("%s", keySegPowerStatusMaster)
-	err := e.kvStore(key, now)
+// AcquirePowerStatusMaster becomes master if there is no master record or it is
+// stale. TAS can't create a missing key, so the first record is a plain store.
+func (e *ETCDStorage) AcquirePowerStatusMaster(now time.Time, staleAfter time.Duration) (bool, error) {
+	lastUpdated, err := e.GetPowerStatusMaster()
 	if err != nil {
-		e.Logger.Error(err)
+		return false, err
 	}
-	return err
+	if lastUpdated == nil {
+		// If two instances race here, the loser's next keep-alive TAS fails and it
+		// steps down.
+		if err := e.kvStore(keySegPowerStatusMaster, now); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if !lastUpdated.Before(now.Add(-staleAfter)) {
+		return false, nil
+	}
+	return e.TASPowerStatusMaster(now, *lastUpdated)
 }
 
 func (e *ETCDStorage) TASPowerStatusMaster(now time.Time, testVal time.Time) (bool, error) {

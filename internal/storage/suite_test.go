@@ -14,7 +14,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	migratepg "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	testetcd "github.com/testcontainers/testcontainers-go/modules/etcd"
@@ -25,7 +24,6 @@ import (
 type StorageTestSuite struct {
 	suite.Suite
 	sp         StorageProvider
-	dlp        DistributedLockProvider
 	containers map[string]testcontainers.Container
 
 	storageContainer testcontainers.Container
@@ -76,19 +74,10 @@ func (s *StorageTestSuite) SetupSuite() {
 		s.T().Fatalf("Error creating storage provider: %v", err)
 	}
 
-	s.dlp, err = s.createDistLockProvider()
-	if err != nil {
-		s.T().Fatalf("Error creating distributed lock provider: %v\n", err)
-	}
 	// Initialize the storage provider
 	err = s.sp.Init(nil)
 	if err != nil {
 		s.T().Fatalf("Error initializing storage provider: %v\n", err)
-	}
-	// Initialize the distributed lock provider
-	err = s.dlp.Init(logrus.New())
-	if err != nil {
-		s.T().Fatalf("Error initializing distributed lock provider: %v\n", err)
 	}
 }
 
@@ -134,36 +123,6 @@ func (s *StorageTestSuite) createStorageProvider() (StorageProvider, error) {
 	}
 
 	return provider, nil
-}
-
-func (s *StorageTestSuite) createDistLockProvider() (DistributedLockProvider, error) {
-	storage := os.Getenv(STORAGE_ENV)
-	var provider DistributedLockProvider
-	switch storage {
-	case STORAGE_MEMORY:
-		provider = &MEMLockProvider{}
-	case STORAGE_ETCD:
-		provider = &ETCDLockProvider{}
-	case STORAGE_POSTGRES:
-		config, err := configurePostgres(s.storageContainer)
-		if err != nil {
-			return nil, err
-		}
-		provider = &PostgresLockProvider{
-			Config: config,
-		}
-	default:
-		config, err := configurePostgres(s.storageContainer)
-		if err != nil {
-			return nil, err
-		}
-		provider = &PostgresLockProvider{
-			Config: config,
-		}
-	}
-
-	return provider, nil
-
 }
 
 func startPostgresContainer() (testcontainers.Container, string, error) {

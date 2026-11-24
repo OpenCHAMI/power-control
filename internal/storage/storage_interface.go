@@ -36,7 +36,9 @@ type StorageProvider interface {
 	Ping() error
 
 	GetPowerStatusMaster() (*time.Time, error)
-	StorePowerStatusMaster(now time.Time) error
+	// AcquirePowerStatusMaster makes the caller master if there is no master or
+	// the current one hasn't refreshed within staleAfter.
+	AcquirePowerStatusMaster(now time.Time, staleAfter time.Duration) (bool, error)
 	TASPowerStatusMaster(now time.Time, testVal time.Time) (bool, error)
 	StorePowerStatus(p model.PowerStatusComponent) error
 	DeletePowerStatus(xname string) error
@@ -63,15 +65,5 @@ type StorageProvider interface {
 	DeleteTransitionTask(transitionID uuid.UUID, taskID uuid.UUID) error
 	TASTransition(transition model.Transition, testVal model.Transition) (bool, error)
 	// Close closes the storage provider and releases any resources it holds.
-	Close() error
-}
-
-type DistributedLockProvider interface {
-	Init(Logger *logrus.Logger) error
-	Ping() error
-	GetDuration() time.Duration
-	DistributedTimedLock(maxLockTime time.Duration) error
-	Unlock() error
-	// Close closes the distributed lock provider and releases any resources it holds.
 	Close() error
 }

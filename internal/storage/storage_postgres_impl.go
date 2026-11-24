@@ -155,19 +155,27 @@ func (p *PostgresStorage) GetPowerStatusMaster() (*time.Time, error) {
 	return &lastUpdated, nil
 }
 
-func (p *PostgresStorage) StorePowerStatusMaster(now time.Time) error {
+// AcquirePowerStatusMaster becomes master if there is no master row or it is
+// stale. The single upsert is atomic, so no additional locking is needed.
+func (p *PostgresStorage) AcquirePowerStatusMaster(now time.Time, staleAfter time.Duration) (bool, error) {
 	exec := `
 		INSERT INTO power_status_master (last_updated)
 		VALUES ($1)
 		ON CONFLICT (singleton) DO UPDATE SET
 			last_updated = EXCLUDED.last_updated
+		WHERE power_status_master.last_updated < $2
 	`
-	_, err := p.db.Exec(exec, now)
+	result, err := p.db.Exec(exec, now, now.Add(-staleAfter))
 	if err != nil {
-		return fmt.Errorf("failed to store power status master timestamp: %w", err)
+		return false, fmt.Errorf("failed to acquire power status master: %w", err)
 	}
 
-	return nil
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return rowsAffected > 0, nil
 }
 
 func (p *PostgresStorage) TASPowerStatusMaster(now time.Time, testVal time.Time) (bool, error) {

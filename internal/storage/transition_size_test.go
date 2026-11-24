@@ -43,30 +43,22 @@ type EtcdTestSettings struct {
 
 var DEFAULT_TEST_SETTINGS *EtcdTestSettings // nil means default settings
 
-func createProviders(t *testing.T, settings *EtcdTestSettings) (StorageProvider, DistributedLockProvider, bool) {
+func createProviders(t *testing.T, settings *EtcdTestSettings) (StorageProvider, bool) {
 	var ms StorageProvider
-	var ds DistributedLockProvider
 	isInMemoryProvider := true
 
 	if (os.Getenv("ETCD_HOST") != "") && (os.Getenv("ETCD_PORT") != "") {
 		t.Logf("Using ETCD backing store.")
 		ms = &ETCDStorage{}
-		ds = &ETCDLockProvider{}
 		isInMemoryProvider = false
 	} else {
 		t.Logf("Using In-Memory backing store.")
 		ms = &MEMStorage{}
-		ds = &MEMLockProvider{}
 	}
 
 	err := ms.Init(nil)
 	if err != nil {
 		t.Errorf("Storage Init() failed: %v", err)
-	}
-
-	err = ds.Init(nil)
-	if err != nil {
-		t.Errorf("DistributedLockProvider Init() failed: %v", err)
 	}
 
 	if e, ok := ms.(*ETCDStorage); ok {
@@ -77,11 +69,11 @@ func createProviders(t *testing.T, settings *EtcdTestSettings) (StorageProvider,
 		}
 		t.Logf("ETCD Storage test settings, page_size: %d, message_size: %d, object_size: %d", e.PageSize, e.MaxMessageLen, e.MaxEtcdObjectSize)
 	}
-	return ms, ds, isInMemoryProvider
+	return ms, isInMemoryProvider
 }
 
 func TestWriteTransitions(t *testing.T) {
-	ms, _, _ := createProviders(t, DEFAULT_TEST_SETTINGS)
+	ms, _ := createProviders(t, DEFAULT_TEST_SETTINGS)
 
 	params := newParameters("x7000c0s0b0", 1, "on")
 	transition := newTransition(params)
@@ -112,7 +104,7 @@ func TestMaxTransitionFailure(t *testing.T) {
 		MaxMessageLen:     1000,
 		MaxEtcdObjectSize: 4000000,
 	}
-	ms, _, isInMemoryProvider := createProviders(t, settings)
+	ms, isInMemoryProvider := createProviders(t, settings)
 
 	// skip the test if using the memory based prover.
 	// The memory based provider does not have the size limits that the etcd provider has.
@@ -139,7 +131,7 @@ func TestMaxTransitionFailure(t *testing.T) {
 
 func TestMaxTransition(t *testing.T) {
 	// max object size is 2097152 (2 x 1024 x 1024 bytes)
-	ms, _, _ := createProviders(t, DEFAULT_TEST_SETTINGS)
+	ms, _ := createProviders(t, DEFAULT_TEST_SETTINGS)
 
 	xnameCount := 6000
 	messageLen := 150

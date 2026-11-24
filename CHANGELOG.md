@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Remove the separate distributed lock provider. Power status master election
+  is now handled atomically by the storage backend.
+- Remove the `DistLocking` field from the `/health` response and the
+  `PCS_DISTLOCK_TIMEOUT` setting.
+
 ## [2.13.0] - 2026-10-29
 
 ### Added

@@ -90,10 +90,8 @@ var glogger *logrus.Logger
 var hsmHandle pcshsm.HSMProvider
 var kvStore storage.StorageProvider
 var ccStore credstore.CredStoreProvider
-var distLocker storage.DistributedLockProvider
 var tloc taskrun.TrsAPI
 var pmSampleInterval time.Duration
-var distLockMaxTime time.Duration
 var pstateMonitorRunning bool
 var serviceRunning *bool
 var vaultEnabled = false
@@ -111,12 +109,10 @@ var powerStatusMasterInterval = 15
 // Initialize and start power state monitoring.
 //
 // domGlb:            Domain global object (holds lots of handles)
-// distLockMaxTimeIn: Max time to hold dist'd lock before forfeiting
 // loggerIn:          Logrus logger object.  Will create if nil.
 // sampleInterval:    Time between HW status sampling.
 // Return:            nil on success, else error message.
 func PowerStatusMonitorInit(domGlb *DOMAIN_GLOBALS,
-	distLockMaxTimeIn time.Duration,
 	loggerIn *logrus.Logger,
 	sampleInterval time.Duration,
 	statusTimeoutOverride int,
@@ -141,12 +137,6 @@ func PowerStatusMonitorInit(domGlb *DOMAIN_GLOBALS,
 			return fmt.Errorf("ERROR: must supply valid component cred store handle.")
 		}
 	}
-	if domGlb.DistLock == nil {
-		return fmt.Errorf("ERROR: must supply valid distributed lock object.")
-	}
-	if distLockMaxTimeIn < time.Second {
-		return fmt.Errorf("ERROR: distributed lock max time must be >= 1 second.")
-	}
 	if domGlb.RFTloc == nil {
 		return fmt.Errorf("ERROR: must supply valid Task Runner Service handle.")
 	}
@@ -157,9 +147,7 @@ func PowerStatusMonitorInit(domGlb *DOMAIN_GLOBALS,
 	hsmHandle = domGlb.HSM
 	kvStore = domGlb.DSP
 	ccStore = domGlb.CS
-	distLocker = domGlb.DistLock
 	tloc = domGlb.RFTloc
-	distLockMaxTime = distLockMaxTimeIn
 	pmSampleInterval = sampleInterval
 	serviceRunning = domGlb.Running
 	vaultEnabled = domGlb.VaultEnabled
@@ -1035,51 +1023,18 @@ func toPCSPowerActions(rfPowerActions []string) []string {
 	return pcsPowerActions
 }
 
-// Checks the power status master last updated value in ETCD.
-// If it has been awhile since the last update, attempt to
-// become the new master.
+// Attempts to become the power status master. Succeeds if there is no master
+// yet or the current master has stopped refreshing its timestamp.
 func getPowerStatusMaster() bool {
-	lockErr := distLocker.DistributedTimedLock(distLockMaxTime)
-	if lockErr != nil {
-		// Someone else is already doing this check which means we aren't going to be master.
-		return false
-	}
-	defer func() {
-		unlockErr := distLocker.Unlock()
-		if unlockErr != nil {
-			glogger.Errorf("ERROR releasing distributed lock: %v", unlockErr)
-		}
-	}()
-
 	now := time.Now()
-	lastUpdated, err := kvStore.GetPowerStatusMaster()
+	staleAfter := time.Duration(powerStatusMasterInterval*3) * time.Second
+	acquired, err := kvStore.AcquirePowerStatusMaster(now, staleAfter)
 	if err != nil {
-		glogger.Errorf("ERROR getting power status master: %v", err)
+		glogger.Errorf("ERROR while trying to become the power status master: %v", err)
 		return false
 	}
-	if lastUpdated == nil {
-		// First master. Just set the value to take master.
-		err = kvStore.StorePowerStatusMaster(now)
-		if err != nil {
-			glogger.Errorf("ERROR while trying to become the power status master: %v", err)
-			return false
-		}
-	} else {
-		// Check to see if the previous master died.
-		if lastUpdated.Add(time.Duration(powerStatusMasterInterval*3) * time.Second).After(now) {
-			// Someone else is master
-			return false
-		}
-		success, err := kvStore.TASPowerStatusMaster(now, *lastUpdated)
-		if err != nil {
-			// ETCD error we're not getting master this time
-			glogger.Errorf("ERROR while trying to become the power status master: %v", err)
-			return false
-		}
-		if !success {
-			// Someone else became master
-			return false
-		}
+	if !acquired {
+		return false
 	}
 
 	go startPowerStatusMaster(now)

@@ -71,8 +71,6 @@ func glbInit() {
 		HSM = &hsm.HSMv2{}
 		var DSP storage.StorageProvider
 		sprov := &storage.MEMStorage{Logger: tlogger}
-		var DLOCK storage.DistributedLockProvider
-		tdLock := &storage.MEMLockProvider{Logger: tlogger}
 
 		vaultEnabled := false
 		if os.Getenv("VAULT_ENABLED") != "" {
@@ -109,14 +107,10 @@ func glbInit() {
 		TLOC_rf = winsec
 		TLOC_rf.Init(lsvcName, tlogger)
 
-		DLOCK = tdLock
-		DLOCK.Init(tlogger)
-
 		domGlb.NewGlobals(nil, TLOC_rf, nil, nil, svcClient,
-			&running, DSP, HSM, vaultEnabled, CS, DLOCK, 20000, 1440,
+			&running, DSP, HSM, vaultEnabled, CS, 20000, 1440,
 			"power-status_test-pod")
 
-		tlogger.Errorf("DLOCK: '%v', Globals: '%v'", DLOCK, domGlb)
 		domGlbInit = true
 	}
 }
@@ -282,7 +276,7 @@ func (suite *PwrStat_TS) Test_PowerStatusMonitor() {
 	t = suite.T()
 
 	//First initialize the power monitor
-	err := PowerStatusMonitorInit(&domGlb, (600 * time.Second), tlogger, (5 * time.Second), 30, 3, 100, 2)
+	err := PowerStatusMonitorInit(&domGlb, tlogger, (5 * time.Second), 30, 3, 100, 2)
 	suite.Assert().Equal(nil, err, "PowerStatusMonitorInit() error: %v", err)
 
 	//Wait a while for the internal componant map to get updated.

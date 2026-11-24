@@ -51,11 +51,6 @@ stages:
                 required: True
                 enum:
                   - "connected, responsive"
-              DistLocking:
-                type: str
-                required: True
-                enum:
-                  - "connected, responsive"
               StateManager:
                 type: str
                 required: True

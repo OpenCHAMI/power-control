@@ -65,7 +65,6 @@ var (
 	DSP               storage.StorageProvider
 	HSM               hsm.HSMProvider
 	CS                credstore.CredStoreProvider
-	DLOCK             storage.DistributedLockProvider
 )
 
 const (
@@ -270,7 +269,7 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		return err
 	}
 
-	//STORAGE/DISTLOCK CONFIGURATION
+	//STORAGE CONFIGURATION
 	envstr = os.Getenv("STORAGE")
 	if envstr == "" || envstr == "MEMORY" {
 		tmpStorageImplementation := &storage.MEMStorage{
@@ -282,9 +281,6 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		}
 		DSP = tmpStorageImplementation
 		logger.Log.Info("Storage Provider: In Memory")
-		tmpDistLockImplementation := &storage.MEMLockProvider{}
-		DLOCK = tmpDistLockImplementation
-		logger.Log.Info("Distributed Lock Provider: In Memory")
 	} else if envstr == "ETCD" {
 		tmpStorageImplementation := &storage.ETCDStorage{
 			Logger:            logger.Log,
@@ -295,20 +291,12 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		}
 		DSP = tmpStorageImplementation
 		logger.Log.Info("Storage Provider: ETCD")
-		tmpDistLockImplementation := &storage.ETCDLockProvider{}
-		DLOCK = tmpDistLockImplementation
-		logger.Log.Info("Distributed Lock Provider: ETCD")
 	} else if envstr == "POSTGRES" {
 		tmpStorageImplementation := &storage.PostgresStorage{
 			Config: *postgres,
 		}
 		DSP = tmpStorageImplementation
 		logger.Log.Info("Storage Provider: Postgres")
-		tmpDistLockImplementation := &storage.PostgresLockProvider{
-			Config: *postgres,
-		}
-		DLOCK = tmpDistLockImplementation
-		logger.Log.Info("Distributed Lock Provider: Postgres")
 	} else {
 		logger.Log.Errorf("Unrecognized storage type: %s", envstr)
 		os.Exit(1)
@@ -322,15 +310,6 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		os.Exit(1)
 	}
 	defer DSP.Close()
-
-	err = DLOCK.Init(logger.Log)
-	if err != nil {
-		logger.Log.Errorf("Error initializing distributed lock provider: %v", err)
-		os.Exit(1)
-	}
-	defer DLOCK.Close()
-
-	//TODO: there should be a Ping() to insure dist lock mechanism is alive
 
 	//Hardware State Manager CONFIGURATION
 	HSM = &hsm.HSMv2{}
@@ -397,14 +376,13 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 	var domainGlobals domain.DOMAIN_GLOBALS
 	domainGlobals.NewGlobals(&BaseTRSTask, TLOC_rf, TLOC_svc, rfClient, smdClient,
 		&Running, DSP, HSM, pcs.vaultEnabled,
-		CS, DLOCK, pcs.maxNumCompleted, pcs.expireTimeMins, podName)
+		CS, pcs.maxNumCompleted, pcs.expireTimeMins, podName)
 
 	///////////////////////////////
 	//INITIALIZATION
 	//////////////////////////////
 	domain.Init(&domainGlobals)
 
-	dlockTimeout := 60
 	pwrSampleInterval := 30
 	statusTimeout := 30
 	statusHttpRetries := 3
@@ -420,17 +398,6 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		} else {
 			logger.Log.Infof("Using PCS_POWER_SAMPLE_INTERVAL: %v", tps)
 			pwrSampleInterval = tps
-		}
-	}
-	envstr = os.Getenv("PCS_DISTLOCK_TIMEOUT")
-	if envstr != "" {
-		tps, err := strconv.Atoi(envstr)
-		if err != nil {
-			logger.Log.Errorf("Invalid value of PCS_DISTLOCK_TIMEOUT, defaulting to %d",
-				dlockTimeout)
-		} else {
-			logger.Log.Infof("Using PCS_DISTLOCK_TIMEOUT: %v", tps)
-			dlockTimeout = tps
 		}
 	}
 	envstr = os.Getenv("PCS_STATUS_TIMEOUT")
@@ -478,7 +445,6 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		}
 	}
 	domain.PowerStatusMonitorInit(&domainGlobals,
-		(time.Duration(dlockTimeout) * time.Second),
 		logger.Log, (time.Duration(pwrSampleInterval) * time.Second),
 		statusTimeout, statusHttpRetries, maxIdleConns, maxIdleConnsPerHost)
 

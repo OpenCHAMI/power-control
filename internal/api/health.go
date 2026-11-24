@@ -37,7 +37,6 @@ import (
 
 type healthRsp struct {
 	KvStore      string `json:"KvStore"`
-	DistLocking  string `json:"DistLocking"`
 	StateManager string `json:"StateManager"`
 	Vault        string `json:"Vault"`
 	TaskRunner   string `json:"TaskRunner"`
@@ -69,12 +68,6 @@ func GetReadiness(w http.ResponseWriter, req *http.Request) {
 	err = glb.DSP.Ping()
 	if err != nil {
 		logger.Log.Errorf("%s: Ping() failed to storage provider.", fname)
-		ready = false
-	}
-
-	err = glb.DistLock.Ping()
-	if err != nil {
-		logger.Log.Errorf("%s: Ping() failed to dist lock provider.", fname)
 		ready = false
 	}
 
@@ -137,17 +130,6 @@ func GetHealth(w http.ResponseWriter, req *http.Request) {
 			rspData.KvStore = connected + sep + responsive
 		} else {
 			rspData.KvStore = connected + sep + unresponsive
-		}
-	}
-
-	if glb.DistLock == nil {
-		rspData.DistLocking = unconnected
-	} else {
-		err = glb.DistLock.Ping()
-		if err == nil {
-			rspData.DistLocking = connected + sep + responsive
-		} else {
-			rspData.DistLocking = connected + sep + unresponsive
 		}
 	}
 
