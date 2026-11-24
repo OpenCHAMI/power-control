@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/Cray-HPE/hms-certs/pkg/hms_certs"
+	"github.com/Cray-HPE/hms-xname/xnametypes"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/sirupsen/logrus"
 
@@ -95,16 +96,16 @@ func jawsSuites() []uint16 {
 
 // Determine whether to skip TLS certificate verification for JAWS
 // connections. Defaults to false (certificates are verified) unless
-// PCS_JAWS_INSECURE_SKIP_VERIFY is set to a valid boolean true value;
+// JAWS_INSECURE_SKIP_VERIFY is set to a valid boolean true value;
 // invalid values fail closed.  The shipped Dockerfiles set it to true
 // because current PDU firmware requires insecure transports.
 func jawsInsecureSkipVerify() bool {
 	skipVerify := false
-	envstr := os.Getenv("PCS_JAWS_INSECURE_SKIP_VERIFY")
+	envstr := os.Getenv("JAWS_INSECURE_SKIP_VERIFY")
 	if envstr != "" {
 		yn, err := strconv.ParseBool(envstr)
 		if err != nil {
-			logger.Log.Errorf("Invalid value of PCS_JAWS_INSECURE_SKIP_VERIFY, defaulting to %t",
+			logger.Log.Errorf("Invalid value of JAWS_INSECURE_SKIP_VERIFY, defaulting to %t",
 				skipVerify)
 		} else {
 			skipVerify = yn
@@ -117,7 +118,7 @@ var jawsTLSOnce sync.Once
 var jawsTLSConfig *tls.Config
 
 // Build the shared TLS configuration for JAWS connections.  When
-// certificate verification is enabled (PCS_JAWS_INSECURE_SKIP_VERIFY=false),
+// certificate verification is enabled (JAWS_INSECURE_SKIP_VERIFY=false),
 // PDU certificates are verified against the system CA certificates plus the
 // CA chain referenced by PCS_CA_URI, if set -- the same CA source used for
 // the Redfish HTTP clients.
@@ -179,19 +180,19 @@ var jawsMonitorEnabledOnce sync.Once
 var jawsMonitorEnabledFlag bool
 
 // JawsMonitorEnabled reports whether JAWS PDU monitoring is enabled via the
-// PCS_JAWS_MONITOR environment variable (default false).  It is consulted
+// JAWS_MONITOR environment variable (default false).  It is consulted
 // both when starting JawsMonitor and when deciding whether JAWS outlets are
 // excluded from the normal Redfish power status sweep, so the two can never
 // disagree and leave JAWS outlets unmonitored.
 func JawsMonitorEnabled() bool {
 	jawsMonitorEnabledOnce.Do(func() {
-		envstr := os.Getenv("PCS_JAWS_MONITOR")
+		envstr := os.Getenv("JAWS_MONITOR")
 		if envstr == "" {
 			return
 		}
 		yn, err := strconv.ParseBool(envstr)
 		if err != nil {
-			logger.Log.Errorf("Invalid value of PCS_JAWS_MONITOR, defaulting to %t",
+			logger.Log.Errorf("Invalid value of JAWS_MONITOR, defaulting to %t",
 				jawsMonitorEnabledFlag)
 			return
 		}
@@ -204,14 +205,23 @@ func JawsMonitorEnabled() bool {
 func JawsLoad(xname string, FQDN string, authUser string, authPass string) {
 	timeout := 20
 	client := jawsHTTPClient()
+	markUnavailable := func(reason string) {
+		markJawsOutletsUnavailable(xname, reason)
+	}
 
 	var req *retryablehttp.Request
 
 	// jaws/monitor/outlets
-	jurl, _ := url.Parse("https://" + FQDN + "/jaws/monitor/outlets")
-	req, err := retryablehttp.NewRequest("GET", jurl.String(), nil)
+	jurl, err := url.Parse("https://" + FQDN + "/jaws/monitor/outlets")
 	if err != nil {
 		logger.Log.Error(err)
+		markUnavailable(err.Error())
+		return
+	}
+	req, err = retryablehttp.NewRequest("GET", jurl.String(), nil)
+	if err != nil {
+		logger.Log.Error(err)
+		markUnavailable(err.Error())
 		return
 	}
 
@@ -229,11 +239,13 @@ func JawsLoad(xname string, FQDN string, authUser string, authPass string) {
 	defer drainAndCloseBodyWithCtxCancel(resp, reqCtxCancel)
 	if err != nil {
 		logger.Log.Error(err)
+		markUnavailable(err.Error())
 		return
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		logger.Log.Errorf("JAWS: request for PDU %s returned HTTP status %s",
 			xname, resp.Status)
+		markUnavailable(resp.Status)
 		return
 	}
 
@@ -241,11 +253,13 @@ func JawsLoad(xname string, FQDN string, authUser string, authPass string) {
 	var eps []JawsEndpointStatus
 	if err != nil {
 		logger.Log.Error(err)
+		markUnavailable(err.Error())
 		return
 	}
 	err = json.Unmarshal(body, &eps)
 	if err != nil {
 		logger.Log.Error(err)
+		markUnavailable(err.Error())
 		return
 	}
 
@@ -266,6 +280,24 @@ func JawsLoad(xname string, FQDN string, authUser string, authPass string) {
 		}
 
 		updateHWState(epxname, powerState, pcsmodel.ManagementStateFilter_available, "")
+	}
+}
+
+func markJawsOutletsUnavailable(pduXName string, reason string) {
+	prefix := pduXName + "p"
+	var outletXNames []string
+	hwStateMapLock.RLock()
+	for xname := range hwStateMap {
+		if strings.HasPrefix(xname, prefix) &&
+			xnametypes.GetHMSType(xname) == xnametypes.CabinetPDUPowerConnector {
+			outletXNames = append(outletXNames, xname)
+		}
+	}
+	hwStateMapLock.RUnlock()
+
+	for _, xname := range outletXNames {
+		updateHWState(xname, pcsmodel.PowerStateFilter_Undefined,
+			pcsmodel.ManagementStateFilter_unavailable, reason)
 	}
 }
 

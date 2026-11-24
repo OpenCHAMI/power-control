@@ -50,6 +50,11 @@ The distinction regarding `off` and 'functionally' `off` is important because it
 
 The advantage of this disparate data flow is that we can rely on many data sources to understand the power state of a device. PCS can directly poll the BMC, but can also use information provided by the device itself to know its state.
 
+PCS tracks changed component states in memory until they are sent to SMD. This
+includes JAWS updates received between Redfish sweeps; failed SMD updates are
+retried on subsequent monitor cycles. Only `on` and `off` are sent to SMD,
+and a newer observation supersedes a pending older state.
+
 ## Abstracted States
 
 Redfish has limited power states that are not universally supported.  They typical list of power states are:
