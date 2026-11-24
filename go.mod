@@ -39,7 +39,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.45.0
 	github.com/testcontainers/testcontainers-go/modules/etcd v0.45.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.45.0
-	golang.org/x/exp v0.0.0-20261121134650-e1094eeca1b5
+	golang.org/x/exp v0.0.0-20261124000051-d6646c509b6d
 	golang.org/x/oauth2 v0.38.0
 )
 
