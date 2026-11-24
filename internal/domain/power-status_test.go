@@ -43,6 +43,7 @@ import (
 
 	"github.com/openchami/power-control/v2/internal/credstore"
 	"github.com/openchami/power-control/v2/internal/hsm"
+	"github.com/openchami/power-control/v2/internal/logger"
 	pcsmodel "github.com/openchami/power-control/v2/internal/model"
 	"github.com/openchami/power-control/v2/internal/storage"
 	"github.com/openchami/power-control/v2/internal/taskrun"
@@ -651,4 +652,120 @@ func TestUpdateComponentMapSuccessfulRefresh(t *testing.T) {
 	require.NoError(t, err, "valid empty component arrays must remain supported")
 	require.Empty(t, data)
 	require.Equal(t, 5, requests, "empty component lists should not query endpoints")
+}
+
+type pendingSMDTestProvider struct {
+	hsm.HSMProvider
+	update func([]string, string) error
+}
+
+func (p *pendingSMDTestProvider) BulkComponentStateUpdate(xnames []string, state string) error {
+	return p.update(xnames, state)
+}
+
+type pendingSMDTestStore struct {
+	storage.StorageProvider
+}
+
+func (s *pendingSMDTestStore) StorePowerStatus(pcsmodel.PowerStatusComponent) error {
+	return nil
+}
+
+func setupPendingSMDTest(t *testing.T, update func([]string, string) error) {
+	t.Helper()
+	previousHSM, previousMap, previousStore, previousLogger := hsmHandle, hwStateMap, kvStore, glogger
+	t.Cleanup(func() {
+		hsmHandle, hwStateMap, kvStore, glogger = previousHSM, previousMap, previousStore, previousLogger
+	})
+	hsmHandle = &pendingSMDTestProvider{update: update}
+	kvStore = &pendingSMDTestStore{}
+	glogger = logrus.New()
+	hwStateMap = map[string]*componentPowerInfo{
+		"x0m0p0v1": {PSComp: pcsmodel.PowerStatusComponent{
+			XName: "x0m0p0v1", PowerState: "on", ManagementState: "available",
+		}},
+	}
+}
+
+func TestPendingSMDUpdateRetriesUnchangedState(t *testing.T) {
+	calls := 0
+	setupPendingSMDTest(t, func(xnames []string, state string) error {
+		calls++
+		require.Equal(t, []string{"x0m0p0v1"}, xnames)
+		require.Equal(t, "off", state)
+		if calls == 1 {
+			return fmt.Errorf("SMD unavailable")
+		}
+		return nil
+	})
+
+	updateHWState("x0m0p0v1", pcsmodel.PowerStateFilter_Off, pcsmodel.ManagementStateFilter_available, "")
+	require.Error(t, flushPendingSmdPowerStates())
+	updateHWState("x0m0p0v1", pcsmodel.PowerStateFilter_Off, pcsmodel.ManagementStateFilter_available, "")
+	require.NoError(t, flushPendingSmdPowerStates())
+	require.NoError(t, flushPendingSmdPowerStates())
+	require.Equal(t, 2, calls)
+}
+
+func TestPendingSMDUpdateFromJawsBetweenSweeps(t *testing.T) {
+	var states []string
+	setupPendingSMDTest(t, func(xnames []string, state string) error {
+		require.Equal(t, []string{"x0m0p0v1"}, xnames)
+		states = append(states, state)
+		return nil
+	})
+	previousLogger := logger.Log
+	logger.Log = logrus.New()
+	t.Cleanup(func() { logger.Log = previousLogger })
+	client := jawsHTTPClient()
+	transport := client.HTTPClient.Transport
+	client.HTTPClient.Transport = refreshTransport(func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, "/jaws/monitor/outlets", req.URL.Path)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`[{"id":"A_1","state":"off"}]`)),
+		}, nil
+	})
+	t.Cleanup(func() { client.HTTPClient.Transport = transport })
+
+	JawsLoad("x0m0", "pdu.example", "", "")
+	JawsLoad("x0m0", "pdu.example", "", "")
+	require.NoError(t, flushPendingSmdPowerStates())
+	require.NoError(t, flushPendingSmdPowerStates())
+	require.Equal(t, []string{"off"}, states)
+}
+
+func TestPendingSMDUpdateKeepsChangesDuringSend(t *testing.T) {
+	var states []string
+	setupPendingSMDTest(t, func(xnames []string, state string) error {
+		require.Equal(t, []string{"x0m0p0v1"}, xnames)
+		states = append(states, state)
+		if len(states) == 1 {
+			updateHWState("x0m0p0v1", pcsmodel.PowerStateFilter_On, pcsmodel.ManagementStateFilter_available, "")
+			updateHWState("x0m0p0v1", pcsmodel.PowerStateFilter_Off, pcsmodel.ManagementStateFilter_available, "")
+		}
+		return nil
+	})
+
+	updateHWState("x0m0p0v1", pcsmodel.PowerStateFilter_Off, pcsmodel.ManagementStateFilter_available, "")
+	require.NoError(t, flushPendingSmdPowerStates())
+	require.NoError(t, flushPendingSmdPowerStates())
+	require.NoError(t, flushPendingSmdPowerStates())
+	require.Equal(t, []string{"off", "off"}, states)
+}
+
+func TestPendingSMDUpdateUsesLatestState(t *testing.T) {
+	var states []string
+	setupPendingSMDTest(t, func(xnames []string, state string) error {
+		states = append(states, state)
+		return nil
+	})
+
+	updateHWState("x0m0p0v1", pcsmodel.PowerStateFilter_Off, pcsmodel.ManagementStateFilter_available, "")
+	updateHWState("x0m0p0v1", pcsmodel.PowerStateFilter_Undefined, pcsmodel.ManagementStateFilter_available, "")
+	require.NoError(t, flushPendingSmdPowerStates())
+	require.Empty(t, states)
+	updateHWState("x0m0p0v1", pcsmodel.PowerStateFilter_On, pcsmodel.ManagementStateFilter_available, "")
+	require.NoError(t, flushPendingSmdPowerStates())
+	require.Equal(t, []string{"on"}, states)
 }

@@ -111,11 +111,11 @@ type fakeVault struct {
 
 // runPCS runs the Power Control Service (PCS).
 func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *storage.PostgresConfig, oauth2Config *auth.OAuth2Config) error {
-	if err := os.Setenv("PCS_JAWS_MONITOR", strconv.FormatBool(pcs.jawsMonitor)); err != nil {
-		return fmt.Errorf("set PCS_JAWS_MONITOR: %w", err)
+	if err := os.Setenv("JAWS_MONITOR", strconv.FormatBool(pcs.jawsMonitor)); err != nil {
+		return fmt.Errorf("set JAWS_MONITOR: %w", err)
 	}
-	if err := os.Setenv("PCS_JAWS_INSECURE_SKIP_VERIFY", strconv.FormatBool(pcs.jawsInsecureSkipVerify)); err != nil {
-		return fmt.Errorf("set PCS_JAWS_INSECURE_SKIP_VERIFY: %w", err)
+	if err := os.Setenv("JAWS_INSECURE_SKIP_VERIFY", strconv.FormatBool(pcs.jawsInsecureSkipVerify)); err != nil {
+		return fmt.Errorf("set JAWS_INSECURE_SKIP_VERIFY: %w", err)
 	}
 
 	var authentication auth.Auth
@@ -487,10 +487,10 @@ func runPCS(ctx context.Context, pcs *pcsConfig, etcd *etcdConfig, postgres *sto
 		logger.Log.Infof("Monitoring JAWS devices.")
 		jawsMonitorInterval := pcs.jawsMonitorInterval
 		if jawsMonitorInterval <= 0 {
-			logger.Log.Errorf("Invalid value of PCS_JAWS_MONITOR_INTERVAL, defaulting to 30")
+			logger.Log.Errorf("Invalid value of JAWS_MONITOR_INTERVAL, defaulting to 30")
 			jawsMonitorInterval = 30
 		}
-		logger.Log.Infof("Using PCS_JAWS_MONITOR_INTERVAL: %v", jawsMonitorInterval)
+		logger.Log.Infof("Using JAWS_MONITOR_INTERVAL: %v", jawsMonitorInterval)
 		go domain.JawsMonitor(jawsMonitorInterval)
 	} else {
 		logger.Log.Infof("JAWS Monitoring set to False")

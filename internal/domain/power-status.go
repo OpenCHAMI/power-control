@@ -64,6 +64,8 @@ type componentPowerInfo struct {
 	HSMData     pcshsm.HsmData
 	BmcUsername string
 	BmcPassword string
+	smdPending  bool
+	smdRevision uint64
 }
 
 // Used for local TRS response handling
@@ -903,45 +905,16 @@ func monitorHW() {
 		err := updateComponentMap()
 		if err != nil {
 			glogger.Errorf("Error getting component list from HSM: %v", err)
-			continue
-		}
-
-		//Update the current power states of all components in the component
-		//map by reading the actual hardware.
-
-		// Save the time so we can see which components got updated
-		updated := time.Now()
-		err = getHWStatesFromHW()
-
-		if err != nil {
-			//This means probably nothing got anywhere, so ignore it.
-			glogger.Errorf("ERROR getting HW states: %v", err)
-			continue
-		}
-
-		// Find which components have been updated so we can perform
-		// a bulk update on SMD. Note that we may get some false positives as
-		// the the status field may not be the property updated, but for now
-		// this is acceptable.
-		var updatedComponents []pcsmodel.PowerStatusComponent
-		hwStateMapLock.RLock()
-		for _, comp := range hwStateMap {
-			if comp.PSComp.LastUpdated.After(updated) {
-				updatedComponents = append(updatedComponents, comp.PSComp)
+		} else {
+			//Update the current power states of all components in the component
+			//map by reading the actual hardware.
+			if err = getHWStatesFromHW(); err != nil {
+				glogger.Errorf("ERROR getting HW states: %v", err)
 			}
 		}
-		hwStateMapLock.RUnlock()
 
-		// Update SMD with new power states
-		if len(updatedComponents) > 0 {
-			err = updateSmdPowerState(updatedComponents)
-			if err != nil {
-				glogger.Errorf("ERROR updating SMD power states: %v", err)
-				// Continue monitoring even if SMD update fails
-				continue
-			}
-
-			glogger.Infof("Successfully updated SMD power states for %d components", len(updatedComponents))
+		if err = flushPendingSmdPowerStates(); err != nil {
+			glogger.Errorf("ERROR updating SMD power states: %v", err)
 		}
 	}
 }
@@ -979,6 +952,8 @@ func updateHWState(xname string, hwState pcsmodel.PowerStateFilter,
 	comp.PSComp.ManagementState = mgmtStateStr
 	comp.PSComp.LastUpdated = time.Now()
 	comp.PSComp.Error = errInfo
+	comp.smdPending = true
+	comp.smdRevision++
 
 	//Update stored map
 
@@ -1137,6 +1112,40 @@ func startPowerStatusMaster(lastUpdated time.Time) {
 			lastUpdated = now
 		}
 	}
+}
+
+func flushPendingSmdPowerStates() error {
+	type pendingUpdate struct {
+		comp     *componentPowerInfo
+		revision uint64
+	}
+	pending := make(map[string]pendingUpdate)
+	var updatedComponents []pcsmodel.PowerStatusComponent
+	hwStateMapLock.RLock()
+	for xname, comp := range hwStateMap {
+		if comp.smdPending {
+			pending[xname] = pendingUpdate{comp: comp, revision: comp.smdRevision}
+			updatedComponents = append(updatedComponents, comp.PSComp)
+		}
+	}
+	hwStateMapLock.RUnlock()
+	if len(updatedComponents) == 0 {
+		return nil
+	}
+
+	if err := updateSmdPowerState(updatedComponents); err != nil {
+		return err
+	}
+
+	hwStateMapLock.Lock()
+	for xname, update := range pending {
+		if comp := hwStateMap[xname]; comp == update.comp && comp.smdRevision == update.revision {
+			comp.smdPending = false
+		}
+	}
+	hwStateMapLock.Unlock()
+	glogger.Infof("Processed %d pending component updates for SMD", len(updatedComponents))
+	return nil
 }
 
 func updateSmdPowerState(updatedComponents []pcsmodel.PowerStatusComponent) error {

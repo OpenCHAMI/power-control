@@ -166,21 +166,7 @@ func createRootCommand(pcs *pcsConfig, etcd *etcdConfig, postgres *storage.Postg
 
 // flagToEnvVarName converts a flag name to an environment variable name
 func flagToEnvVarName(flag string) string {
-	switch flag {
-	case "jaws-monitor":
-		return "PCS_JAWS_MONITOR"
-	case "jaws-monitor-interval":
-		return "PCS_JAWS_MONITOR_INTERVAL"
-	case "jaws-insecure-skip-verify":
-		return "PCS_JAWS_INSECURE_SKIP_VERIFY"
-	}
-
-	// TODO: It might be nice to have a standard prefix, but for now
-	// this would have a bit a ripple effect on existing code.
-	// envVarName := "PCS_" + flag
-	envVarName := strings.ToUpper(strings.ReplaceAll(flag, "-", "_"))
-
-	return envVarName
+	return strings.ToUpper(strings.ReplaceAll(flag, "-", "_"))
 }
 
 // envVarError creates an error message for invalid environment variable values
