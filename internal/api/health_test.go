@@ -59,7 +59,6 @@ var (
 	DSP       storage.StorageProvider
 	HSM       hsm.HSMProvider
 	CS        credstore.CredStoreProvider
-	DLOCK     storage.DistributedLockProvider
 	svcClient *hms_certs.HTTPClientPair
 )
 
@@ -95,10 +94,7 @@ func setupGlobals(suite *Models_TS) {
 		Logger: glogger,
 	}
 	DSP = tmpStorageImplementation
-	tmpDistLockImplementation := &storage.MEMLockProvider{}
-	DLOCK = tmpDistLockImplementation
 	DSP.Init(glogger)
-	DLOCK.Init(glogger)
 
 	tmpCS := &credstore.VAULTv0{}
 
@@ -114,7 +110,7 @@ func setupGlobals(suite *Models_TS) {
 	var domainGlobals domain.DOMAIN_GLOBALS
 	domainGlobals.NewGlobals(nil, TLOC_rf, nil, nil, nil,
 		&Running, DSP, HSM, (ve != ""),
-		CS, DLOCK, 20000, 1440, "health_test-pod")
+		CS, 20000, 1440, "health_test-pod")
 	domain.Init(&domainGlobals)
 
 }
@@ -192,9 +188,6 @@ func (suite *Models_TS) TestHealthStuff() {
 	crsp := "connected, responsive"
 	suite.Assert().Equal(crsp, hrsp.KvStore,
 		"Mismatching KVStore status, exp: '%s' got: '%s'", crsp, hrsp.KvStore)
-	suite.Assert().Equal(crsp, hrsp.DistLocking,
-		"Mismatching DistLocking status, exp: '%s' got: '%s'",
-		crsp, hrsp.DistLocking)
 	suite.Assert().Equal(crsp, hrsp.StateManager,
 		"Mismatching StateManager status, exp: '%s' got: '%s'",
 		crsp, hrsp.StateManager)

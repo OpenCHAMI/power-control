@@ -20,16 +20,33 @@ func (s *StorageTestSuite) TestGetPowerStatusMaster() {
 
 }
 
-func (s *StorageTestSuite) TestStorePowerStatusMaster() {
+func (s *StorageTestSuite) TestPowerStatusMasterAcquire() {
 	t := s.T()
 	now := time.Now().Truncate(time.Microsecond)
 
-	err := s.sp.StorePowerStatusMaster(now)
+	// A negative window treats any existing record as stale, so this must succeed.
+	acquired, err := s.sp.AcquirePowerStatusMaster(now, -time.Hour)
 	require.NoError(t, err)
+	require.True(t, acquired, "acquire should succeed when no fresh master exists")
 
 	lastUpdated, err := s.sp.GetPowerStatusMaster()
 	require.NoError(t, err)
-	require.WithinDuration(t, now, *lastUpdated, time.Microsecond, "Stored power status master timestamp does not match the retrieved timestamp")
+	require.WithinDuration(t, now, *lastUpdated, time.Microsecond)
+
+	// The record is fresh, so a second instance must fail to acquire.
+	later := now.Add(time.Second)
+	acquired, err = s.sp.AcquirePowerStatusMaster(later, time.Minute)
+	require.NoError(t, err)
+	require.False(t, acquired, "acquire should fail while the master is fresh")
+
+	lastUpdated, err = s.sp.GetPowerStatusMaster()
+	require.NoError(t, err)
+	require.WithinDuration(t, now, *lastUpdated, time.Microsecond)
+
+	// Once stale, the record can be taken over.
+	acquired, err = s.sp.AcquirePowerStatusMaster(later, 0)
+	require.NoError(t, err)
+	require.True(t, acquired, "acquire should succeed when the master is stale")
 }
 
 func (s *StorageTestSuite) TestTASPowerStatusMaster() {
@@ -37,9 +54,10 @@ func (s *StorageTestSuite) TestTASPowerStatusMaster() {
 	now := time.Now()
 	newVal := now.Add(10 * time.Second)
 
-	// Store the power status master first
-	err := s.sp.StorePowerStatusMaster(now)
+	// Become the power status master first
+	acquired, err := s.sp.AcquirePowerStatusMaster(now, -time.Hour)
 	require.NoError(t, err)
+	require.True(t, acquired)
 
 	result, err := s.sp.TASPowerStatusMaster(newVal, now)
 	require.NoError(t, err)

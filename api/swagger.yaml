@@ -919,9 +919,6 @@ components:
         KvStore:
           description: Status of the KV Store.
           type: string
-        DistLocking:
-          description: Status of the distributed locking mechanism
-          type: string
         StateManager:
           description: Status of the connection to the Hardware State Manager.
           type: string
@@ -938,7 +935,6 @@ components:
         TaskRunnerMode: 'connected, responsive, local mode'
       required:
         - KvStore
-        - DistLocking
         - StateManager
         - Vault
         - TaskRunner

@@ -53,7 +53,6 @@ type DOMAIN_GLOBALS struct {
 	SVCHttpClient   *hms_certs.HTTPClientPair
 	VaultEnabled    bool
 	CS              credstore.CredStoreProvider
-	DistLock        storage.DistributedLockProvider
 	MaxNumCompleted int
 	ExpireTimeMins  int
 	PodName         string
@@ -67,7 +66,6 @@ func (g *DOMAIN_GLOBALS) NewGlobals(base *taskrun.HttpTask,
 	running *bool, dsp storage.StorageProvider,
 	hsm hsm.HSMProvider, vaultEnabled bool,
 	credStore credstore.CredStoreProvider,
-	distLock storage.DistributedLockProvider,
 	maxNumCompleted int, expireTimeMins int,
 	podName string) {
 	g.BaseTRSTask = base
@@ -80,7 +78,6 @@ func (g *DOMAIN_GLOBALS) NewGlobals(base *taskrun.HttpTask,
 	g.HSM = hsm
 	g.VaultEnabled = vaultEnabled
 	g.CS = credStore
-	g.DistLock = distLock
 	g.MaxNumCompleted = maxNumCompleted
 	g.ExpireTimeMins = expireTimeMins
 	g.PodName = podName

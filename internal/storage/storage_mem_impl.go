@@ -95,9 +95,9 @@ func (m *MEMStorage) GetPowerStatusMaster() (*time.Time, error) {
 	return e.GetPowerStatusMaster()
 }
 
-func (m *MEMStorage) StorePowerStatusMaster(now time.Time) error {
+func (m *MEMStorage) AcquirePowerStatusMaster(now time.Time, staleAfter time.Duration) (bool, error) {
 	e := toETCDStorage(m)
-	return e.StorePowerStatusMaster(now)
+	return e.AcquirePowerStatusMaster(now, staleAfter)
 }
 
 func (m *MEMStorage) TASPowerStatusMaster(now time.Time, testVal time.Time) (bool, error) {

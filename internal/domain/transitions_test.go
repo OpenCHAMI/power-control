@@ -60,7 +60,6 @@ func (ts *Transitions_TS) SetupSuite() {
 		TLOC_rf, TLOC_svc taskrun.TrsAPI
 		serviceName       string = "PCS-domain-transitions-test"
 		DSP               storage.StorageProvider
-		DLOCK             storage.DistributedLockProvider
 		HSM               hsm.HSMProvider
 		// StateManagerServer string
 		credStoreGlob credstore.CREDSTORE_GLOBALS
@@ -111,12 +110,6 @@ func (ts *Transitions_TS) SetupSuite() {
 	DSP = tmpStorageImplementation
 	DSP.Init(logger.Log)
 
-	tmpStorageLockImplementation := &storage.ETCDLockProvider{
-		Logger: logger.Log,
-	}
-	DLOCK = tmpStorageLockImplementation
-	DLOCK.Init(logger.Log)
-
 	HSM = &hsm.HSMv2{}
 
 	hsmGlob := hsm.HSM_GLOBALS{
@@ -132,7 +125,7 @@ func (ts *Transitions_TS) SetupSuite() {
 
 	domainGlobals.NewGlobals(&BaseTRSTask, TLOC_rf, TLOC_svc, nil, svcClient,
 		&Running, DSP, HSM, enableVault, CS,
-		DLOCK, 20000, 1440, "transitions_test-pod")
+		20000, 1440, "transitions_test-pod")
 	Init(&domainGlobals)
 
 	// Calling PowerStatusMonitorInit() is required to initialize the
@@ -142,9 +135,7 @@ func (ts *Transitions_TS) SetupSuite() {
 	hsmHandle = domainGlobals.HSM
 	kvStore = domainGlobals.DSP
 	ccStore = domainGlobals.CS
-	distLocker = domainGlobals.DistLock
 	tloc = domainGlobals.RFTloc
-	distLockMaxTime = 600 * time.Second
 	pmSampleInterval = 5 * time.Second
 	serviceRunning = domainGlobals.Running
 	vaultEnabled = domainGlobals.VaultEnabled

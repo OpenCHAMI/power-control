@@ -276,7 +276,7 @@ func doSetup() error {
 	HSM.Init(&hsmGlob)
 
 	domainGlobals.NewGlobals(&BaseTRSTask, TLOC_rf, TLOC_svc, nil, nil,
-		&Running, DSP, HSM, VaultEnabled, nil, nil,
+		&Running, DSP, HSM, VaultEnabled, nil,
 		20000, 1440, "power-cap_test-pod")
 	Init(&domainGlobals)
 	return nil
